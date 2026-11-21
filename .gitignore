@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables (never commit real secrets)
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+
+# Build outputs
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Local n8n / Docker runtime data (if ever placed in workspace)
+.n8n/
+n8n_data/
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# Test coverage / temporary artifacts
+coverage/
+tmp/
+*.tmp
