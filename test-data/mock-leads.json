@@ -1,0 +1,324 @@
+[
+  {
+    "id": "TC01",
+    "case_name": "Qualified (High) — SaaS MVP in preferred budget",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "qualified",
+      "priority": "high",
+      "score_range": "75-100",
+      "approval_status": "pending",
+      "followup_eligible": true
+    },
+    "payload": {
+      "submission_id": "sub_20261120_001",
+      "full_name": "Sarah Chen",
+      "email": "sarah.chen@acmesaas.io",
+      "company_name": "Acme SaaS Inc.",
+      "phone": "+1-415-555-0192",
+      "service_type": "Custom Web Applications & SaaS MVPs",
+      "budget_min": 12000,
+      "budget_max": 18000,
+      "budget_currency": "USD",
+      "timeline_weeks": 10,
+      "project_description": "We are a Seed-stage B2B SaaS startup looking to build an MVP customer portal using React, Next.js, and Node.js. Core features include role-based access, Stripe subscription billing, and HubSpot contact sync. Wireframes and PRD are already finalized.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:00:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC02",
+    "case_name": "Qualified — Third-party API & Database Integration",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "qualified",
+      "priority": "high",
+      "score_range": "75-100",
+      "approval_status": "pending",
+      "followup_eligible": true
+    },
+    "payload": {
+      "submission_id": "sub_20261120_002",
+      "full_name": "Marcus Weber",
+      "email": "m.weber@nordiclogistics.eu",
+      "company_name": "Nordic Logistics GmbH",
+      "phone": "+49-30-5550148",
+      "service_type": "Third-party API & Database Integrations",
+      "budget_min": 6000,
+      "budget_max": 9500,
+      "budget_currency": "USD",
+      "timeline_weeks": 6,
+      "project_description": "Need to integrate our PostgreSQL warehouse database with Shopify Plus and NetSuite ERP via webhooks and scheduled sync jobs. We have API docs ready and need reliable retry and error logging.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:05:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC03",
+    "case_name": "Needs Review — Borderline budget ($1,500-$2,999)",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "needs_review",
+      "priority": "medium",
+      "score_range": "45-74",
+      "approval_status": "pending",
+      "followup_eligible": true
+    },
+    "payload": {
+      "submission_id": "sub_20261120_003",
+      "full_name": "Daniel Brooks",
+      "email": "daniel@brookscounsel.com",
+      "company_name": "Brooks Advisory LLC",
+      "phone": "+1-312-555-0144",
+      "service_type": "B2B Marketing & Corporate Websites",
+      "budget_min": 2000,
+      "budget_max": 2500,
+      "budget_currency": "USD",
+      "timeline_weeks": 5,
+      "project_description": "We need a clean 5-page B2B corporate website with a case study section and a lead capture form connected to HubSpot. Copy is ready, brand colors exist, but we do not have Figma designs yet.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:10:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC04",
+    "case_name": "Needs Review — Undisclosed budget & missing scope details",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "needs_review",
+      "priority": "medium",
+      "score_range": "45-74",
+      "approval_status": "pending",
+      "followup_eligible": true
+    },
+    "payload": {
+      "submission_id": "sub_20261120_004",
+      "full_name": "Elena Rossi",
+      "email": "elena@fintracklabs.co",
+      "company_name": "FinTrack Labs",
+      "phone": null,
+      "service_type": "Web App Redesign & Performance Optimization",
+      "budget_min": null,
+      "budget_max": null,
+      "budget_currency": "USD",
+      "timeline_weeks": null,
+      "project_description": "Our existing React analytics dashboard feels slow and outdated. We want to redesign the main reporting screens and improve load speed. Happy to discuss budget and timeline on a quick call.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:15:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC05",
+    "case_name": "Not Qualified — Budget below $1,500 deal-breaker",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "not_qualified",
+      "priority": "low",
+      "score_range": "0-44 (deal-breaker override)",
+      "approval_status": "not_required",
+      "followup_eligible": false
+    },
+    "payload": {
+      "submission_id": "sub_20261120_005",
+      "full_name": "Kevin Tran",
+      "email": "kevin.tran99@gmail.com",
+      "company_name": "SideHustle App",
+      "phone": null,
+      "service_type": "Custom Web Applications & SaaS MVPs",
+      "budget_min": 500,
+      "budget_max": 800,
+      "budget_currency": "USD",
+      "timeline_weeks": 3,
+      "project_description": "Looking for someone to build a full marketplace web app similar to Airbnb with chat, payments, and admin dashboard. Maximum budget is $800.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:20:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC06",
+    "case_name": "Not Qualified — Out of scope (Native iOS/Android mobile app)",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "not_qualified",
+      "priority": "low",
+      "score_range": "0-44 (deal-breaker override)",
+      "approval_status": "not_required",
+      "followup_eligible": false
+    },
+    "payload": {
+      "submission_id": "sub_20261120_006",
+      "full_name": "Priya Patel",
+      "email": "priya@fitpulseapp.com",
+      "company_name": "FitPulse",
+      "phone": "+1-646-555-0188",
+      "service_type": "Native Mobile App (iOS & Android)",
+      "budget_min": 8000,
+      "budget_max": 12000,
+      "budget_currency": "USD",
+      "timeline_weeks": 8,
+      "project_description": "We need a native Swift iOS and Kotlin Android fitness tracking app with Apple Watch Bluetooth integration. No web application needed.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:25:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC07",
+    "case_name": "Not Qualified — Spam / Cold pitch",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "not_qualified",
+      "priority": "low",
+      "spam_suspected": true,
+      "approval_status": "not_required",
+      "followup_eligible": false
+    },
+    "payload": {
+      "submission_id": "sub_20261120_007",
+      "full_name": "Alex Growth",
+      "email": "alex@toprank-backlinks.biz",
+      "company_name": "TopRank SEO Agency",
+      "phone": null,
+      "service_type": "Other",
+      "budget_min": null,
+      "budget_max": null,
+      "budget_currency": "USD",
+      "timeline_weeks": null,
+      "project_description": "Hi Veloce Digital team! I noticed your site is not ranking #1 on Google. We offer 500 high-DA guest post backlinks for only $299/month. Reply YES to get a free SEO audit today!",
+      "consent_to_email": false,
+      "consent_timestamp": null,
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC08",
+    "case_name": "Duplicate submission_id — Exact replay of TC01",
+    "expected_outcome": {
+      "validation": "pass",
+      "deduplication": "blocked (duplicate submission_id)",
+      "note": "Must NOT create a second inquiry, call AI again, or send duplicate Slack/CRM events."
+    },
+    "payload": {
+      "submission_id": "sub_20261120_001",
+      "full_name": "Sarah Chen",
+      "email": "sarah.chen@acmesaas.io",
+      "company_name": "Acme SaaS Inc.",
+      "phone": "+1-415-555-0192",
+      "service_type": "Custom Web Applications & SaaS MVPs",
+      "budget_min": 12000,
+      "budget_max": 18000,
+      "budget_currency": "USD",
+      "timeline_weeks": 10,
+      "project_description": "We are a Seed-stage B2B SaaS startup looking to build an MVP customer portal using React, Next.js, and Node.js. Core features include role-based access, Stripe subscription billing, and HubSpot contact sync. Wireframes and PRD are already finalized.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:00:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC09",
+    "case_name": "Existing contact (uppercase/spaces email) — New distinct inquiry",
+    "expected_outcome": {
+      "validation": "pass",
+      "normalization": "email normalized to sarah.chen@acmesaas.io",
+      "deduplication": "reuse existing contact, create NEW inquiry",
+      "lead_status": "qualified"
+    },
+    "payload": {
+      "submission_id": "sub_20261120_009",
+      "full_name": "  Sarah Chen  ",
+      "email": "  SARAH.CHEN@ACMESAAS.IO  ",
+      "company_name": "Acme SaaS Inc.",
+      "phone": "+1-415-555-0192",
+      "service_type": "B2B Marketing & Corporate Websites",
+      "budget_min": 5500,
+      "budget_max": 8000,
+      "budget_currency": "USD",
+      "timeline_weeks": 6,
+      "project_description": "Separate from our customer portal inquiry, we also want to rebuild our public B2B marketing website in Next.js before our Series A announcement in Q1.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:30:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC10",
+    "case_name": "Qualified but NO email consent (consent_to_email = false)",
+    "expected_outcome": {
+      "validation": "pass",
+      "lead_status": "qualified",
+      "priority": "high",
+      "followup_status": "not_eligible",
+      "note": "WF03 must NOT send automated follow-up email."
+    },
+    "payload": {
+      "submission_id": "sub_20261120_010",
+      "full_name": "Claire Dubois",
+      "email": "claire.dubois@ateliercloud.fr",
+      "company_name": "Atelier Cloud SAS",
+      "phone": "+33-1-5550199",
+      "service_type": "Custom Web Applications & SaaS MVPs",
+      "budget_min": 15000,
+      "budget_max": 22000,
+      "budget_currency": "USD",
+      "timeline_weeks": 12,
+      "project_description": "Building an internal B2B order management web app in React and Node.js with PostgreSQL backend. Please contact me only regarding this inquiry; I do not opt in to automated follow-ups.",
+      "consent_to_email": false,
+      "consent_timestamp": null,
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC11",
+    "case_name": "Invalid email format",
+    "expected_outcome": {
+      "validation": "fail",
+      "note": "Reject at validation node; do NOT call AI or create contact/inquiry."
+    },
+    "payload": {
+      "submission_id": "sub_20261120_011",
+      "full_name": "Tom Nguyen",
+      "email": "tom.nguyen-not-an-email",
+      "company_name": "Test Corp",
+      "phone": null,
+      "service_type": "Custom Web Applications & SaaS MVPs",
+      "budget_min": 7000,
+      "budget_max": 10000,
+      "budget_currency": "USD",
+      "timeline_weeks": 8,
+      "project_description": "Testing invalid email handling in WF01 validation step.",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:35:00Z",
+      "consent_source": "website_contact_form"
+    }
+  },
+  {
+    "id": "TC12",
+    "case_name": "Missing required fields (empty project_description & full_name)",
+    "expected_outcome": {
+      "validation": "fail",
+      "note": "Reject at validation node; do NOT call AI."
+    },
+    "payload": {
+      "submission_id": "sub_20261120_012",
+      "full_name": "",
+      "email": "missing.fields@example.com",
+      "company_name": "Incomplete Co",
+      "phone": null,
+      "service_type": "B2B Marketing & Corporate Websites",
+      "budget_min": 4000,
+      "budget_max": 6000,
+      "budget_currency": "USD",
+      "timeline_weeks": 6,
+      "project_description": "",
+      "consent_to_email": true,
+      "consent_timestamp": "2026-11-20T16:40:00Z",
+      "consent_source": "website_contact_form"
+    }
+  }
+]
