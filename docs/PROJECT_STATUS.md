@@ -6,17 +6,17 @@
 - **Current Workflow Stage:** Stage 2 (AI Dev Environment) — Completed
 - **Current Roadmap Day:** Day 3 (Lead Intake)
 - **Active Git Branch:** `feat/day3-lead-intake`
-- **Overall Progress:** `6 / 51` roadmap tasks completed (`11.8%`)
+- **Overall Progress:** `7 / 51` roadmap tasks completed (`13.7%`)
 - **Last Updated:** 2026-11-22
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Stage 2 AI Dev Environment — created `.agents/rules/{n8n-sync.md, supabase-rls.md}`, `.agents/skills/{leadflow-n8n-sanitize, leadflow-vitest-verify}`, `database/schema/002_score_breakdown_and_triggers.sql`, `database/policies/001_rls_and_grants.sql`, and `n8n/scripts/sync-workflows.ts`. Verified local n8n REST API connectivity (`1` existing workflow: `WF01 - Lead Intake & Qualification`).
-2. **Current State / Branch:** Branch `feat/day3-lead-intake` is clean with Stages 1 & 2 committed. Root `.env` is configured and gitignored.
-3. **Blockers / Pending Actions:** Run `database/schema/002_score_breakdown_and_triggers.sql` and `database/policies/001_rls_and_grants.sql` on Supabase (`dev` & `test`) — live probe showed `service_role` currently gets HTTP `403` (`42501 permission denied`) and `lead_analyses.score_breakdown` is not yet applied (`42703`). Also prepare `backend/.env` and `frontend/.env` before starting Stage 3.
-4. **Next Immediate Action:** Begin **Stage 3 — Day 3 Lead Intake** (scaffold Express API Gateway `backend/`, React Form `frontend/`, and WF01 Webhook Trigger JSON synced via `sync-workflows.ts`).
+1. **Last Completed:** Stage 2 AI Dev Environment + Supabase DB hardening (`leadflow-ai`): applied `002_score_breakdown_and_triggers.sql` (`score_breakdown` + 2 triggers) and full `001_rls_and_grants.sql` (`6/6` tables with RLS enabled, `6/6` `SELECT` policies for `authenticated` using initPlan-cached `auth.uid() IS NOT NULL`, `authenticated` restricted strictly to `SELECT`, `anon` revoked, `service_role` full DML; Supabase security advisors: `0` issues). Root `.env`, `backend/.env`, and `frontend/.env` are configured and gitignored.
+2. **Current State / Branch:** Branch `feat/day3-lead-intake` has Stages 1 & 2 committed plus updated `database/policies/001_rls_and_grants.sql` and `docs/PROJECT_STATUS.md`. Ready to scaffold Stage 3 (Day 3).
+3. **Blockers / Pending Actions:** No blockers for Day 3. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) confirm LLM provider (`OpenAI gpt-4o-mini` in ADRs vs `DEEPSEEK_API_KEY` in `backend/.env`) before Day 5; (c) note `TEST_SUPABASE_URL` currently points to `leadflow-ai` (separate test project or strict `TEST_RUN_PREFIX` cleanup needed before Day 13).
+4. **Next Immediate Action:** Begin **Stage 3 — Day 3 Lead Intake** (create WF01 Webhook Trigger JSON synced via `sync-workflows.ts`, scaffold Express API Gateway `backend/`, and build React Lead Form `frontend/`).
 5. **Key Reference Files:** `AGENTS.md`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/scripts/sync-workflows.ts`, `database/policies/001_rls_and_grants.sql`.
 
 ---
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`6 / 51`)
+## 14-Day Master Roadmap Checklist (`7 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -75,8 +75,8 @@
 - [ ] Format structured notification message with dashboard review link
 - [ ] Alert only for `qualified` (`[HIGH PRIORITY]`) and `needs_review` (`[NEEDS REVIEW]`) leads
 
-### Day 9 — Human Approval Dashboard (`0 / 4`)
-- [ ] Apply Supabase Auth & RLS policies (`database/policies/`)
+### Day 9 — Human Approval Dashboard (`1 / 4`)
+- [x] Apply Supabase Auth & RLS policies (`database/policies/`) *(6/6 tables RLS + least-privilege grants verified on `leadflow-ai`; create reviewer user in `auth.users` when testing Day 9 login)*
 - [ ] Build lead review dashboard screen showing AI summary, score breakdown & email draft (`frontend/`)
 - [ ] Build authenticated Approve / Reject endpoints (`backend/`)
 - [ ] Verify JWT authentication & authorization before executing actions
