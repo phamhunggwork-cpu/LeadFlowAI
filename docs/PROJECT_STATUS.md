@@ -3,21 +3,21 @@
 > **Single Source of Truth** for project progress (51 tasks across 14 days) and cross-session continuity.
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
-- **Current Workflow Stage:** Stage 2 (AI Dev Environment) — Completed
+- **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
 - **Current Roadmap Day:** Day 3 (Lead Intake)
 - **Active Git Branch:** `feat/day3-lead-intake`
-- **Overall Progress:** `7 / 51` roadmap tasks completed (`13.7%`)
+- **Overall Progress:** `8 / 51` roadmap tasks completed (`15.7%`)
 - **Last Updated:** 2026-11-22
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Stage 2 AI Dev Environment + Supabase DB hardening (`leadflow-ai`): applied `002_score_breakdown_and_triggers.sql` (`score_breakdown` + 2 triggers) and full `001_rls_and_grants.sql` (`6/6` tables with RLS enabled, `6/6` `SELECT` policies for `authenticated` using initPlan-cached `auth.uid() IS NOT NULL`, `authenticated` restricted strictly to `SELECT`, `anon` revoked, `service_role` full DML; Supabase security advisors: `0` issues). Root `.env`, `backend/.env`, and `frontend/.env` are configured and gitignored.
-2. **Current State / Branch:** Branch `feat/day3-lead-intake` has Stages 1 & 2 committed plus updated `database/policies/001_rls_and_grants.sql` and `docs/PROJECT_STATUS.md`. Ready to scaffold Stage 3 (Day 3).
+1. **Last Completed:** Day 3 Task 1 (`WF01` Webhook Trigger) — updated `WF01 - Lead Intake & Qualification` (`id=Mynf0z0HIudjtNXF`) on local n8n with `Receive Lead Intake Webhook` (`POST /webhook/lead-intake`, `headerAuth` `x-webhook-secret`, `responseMode: responseNode`) + `Acknowledge Lead Accepted` (HTTP `202` JSON), published (`ACTIVE`), verified live (`403` missing/wrong secret, `202` valid secret with `submission_id`), backed up to `tmp/n8n-backup/`, and saved sanitized JSON to `n8n/workflows/wf01-lead-intake-qualification.json` (`leadflow-n8n-sanitize` + `sync-workflows.ts --dry-run` PASS).
+2. **Current State / Branch:** Branch `feat/day3-lead-intake` has Day 3 Task 1 (`WF01`) completed and ready to commit (`n8n/workflows/wf01-lead-intake-qualification.json`, `docs/PROJECT_STATUS.md`).
 3. **Blockers / Pending Actions:** No blockers for Day 3. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) confirm LLM provider (`OpenAI gpt-4o-mini` in ADRs vs `DEEPSEEK_API_KEY` in `backend/.env`) before Day 5; (c) note `TEST_SUPABASE_URL` currently points to `leadflow-ai` (separate test project or strict `TEST_RUN_PREFIX` cleanup needed before Day 13).
-4. **Next Immediate Action:** Begin **Stage 3 — Day 3 Lead Intake** (create WF01 Webhook Trigger JSON synced via `sync-workflows.ts`, scaffold Express API Gateway `backend/`, and build React Lead Form `frontend/`).
-5. **Key Reference Files:** `AGENTS.md`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/scripts/sync-workflows.ts`, `database/policies/001_rls_and_grants.sql`.
+4. **Next Immediate Action:** Continue **Day 3 — Lead Intake** Task 2: scaffold Node.js Express API Gateway (`backend/`) with `GET /api/health` and `POST /api/leads` (Zod validation + `x-webhook-secret` proxy to WF01).
+5. **Key Reference Files:** `AGENTS.md`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/workflows/wf01-lead-intake-qualification.json`, `backend/.env.example`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`7 / 51`)
+## 14-Day Master Roadmap Checklist (`8 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -42,10 +42,10 @@
 - [x] Create Supabase project and initial 6 tables (`database/schema/LeadFlowAI.sql`)
 - [x] Create test form (`tests/test-form.html`) and simulated mock dataset (`test-data/mock-leads.json`)
 
-### Day 3 — Lead Intake (`0 / 3`)
+### Day 3 — Lead Intake (`1 / 3`)
 - [ ] Create React form (`frontend/`)
 - [ ] Create Node.js Express API Gateway calling authenticated n8n webhook (`backend/`)
-- [ ] Create WF01 Webhook Trigger in n8n (`n8n/workflows/wf01-lead-intake-qualification.json`)
+- [x] Create WF01 Webhook Trigger in n8n (`n8n/workflows/wf01-lead-intake-qualification.json`)
 
 ### Day 4 — Validation & Duplicate Prevention (`0 / 4`)
 - [ ] Validate required fields and email format (Zod + WF01)
