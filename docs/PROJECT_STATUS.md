@@ -3,7 +3,7 @@
 > **Single Source of Truth** for project progress (51 tasks across 14 days) and cross-session continuity.
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
-- **Current Workflow Stage:** Stage 1 (Foundation) — Completed
+- **Current Workflow Stage:** Stage 2 (AI Dev Environment) — Completed
 - **Current Roadmap Day:** Day 3 (Lead Intake)
 - **Active Git Branch:** `feat/day3-lead-intake`
 - **Overall Progress:** `6 / 51` roadmap tasks completed (`11.8%`)
@@ -13,18 +13,18 @@
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Stage 1 Foundation — created `AGENTS.md`, `docs/DECISIONS.md`, `docs/architecture/03-api-and-rls-contract.md`, `docs/TESTING_STRATEGY.md`, `docs/PROJECT_STATUS.md`, and `.env.example` templates; committed `docs/setup/git-workflow.md`. Installed Antigravity official plugins (`Supabase` & `n8n`).
-2. **Current State / Branch:** Branch `feat/day3-lead-intake` is clean with Stage 1 committed. No app source code (`frontend/`, `backend/`, `n8n/`) has been scaffolded yet.
-3. **Blockers / Pending Confirmations:** Before Stage 2 execution, confirm: (a) local-only vs online demo deployment, (b) external API keys ready (OpenAI/Resend/HubSpot/Slack), (c) local n8n Public API key enabled on `localhost:5678`, (d) dedicated Supabase `test` project created alongside `dev`.
-4. **Next Immediate Action:** Execute **Stage 2 (AI Dev Environment)** — add `.agents/rules/{n8n-sync.md, supabase-rls.md}`, `.agents/skills/{leadflow-n8n-sanitize, leadflow-vitest-verify}`, additive SQL migration `002_score_breakdown_and_triggers.sql`, and `n8n/scripts/sync-workflows.ts`.
-5. **Key Reference Files:** `AGENTS.md`, `docs/DECISIONS.md`, `docs/architecture/03-api-and-rls-contract.md`, `database/schema/LeadFlowAI.sql`.
+1. **Last Completed:** Stage 2 AI Dev Environment — created `.agents/rules/{n8n-sync.md, supabase-rls.md}`, `.agents/skills/{leadflow-n8n-sanitize, leadflow-vitest-verify}`, `database/schema/002_score_breakdown_and_triggers.sql`, `database/policies/001_rls_and_grants.sql`, and `n8n/scripts/sync-workflows.ts`. Verified local n8n REST API connectivity (`1` existing workflow: `WF01 - Lead Intake & Qualification`).
+2. **Current State / Branch:** Branch `feat/day3-lead-intake` is clean with Stages 1 & 2 committed. Root `.env` is configured and gitignored.
+3. **Blockers / Pending Actions:** Run `database/schema/002_score_breakdown_and_triggers.sql` and `database/policies/001_rls_and_grants.sql` on Supabase (`dev` & `test`) — live probe showed `service_role` currently gets HTTP `403` (`42501 permission denied`) and `lead_analyses.score_breakdown` is not yet applied (`42703`). Also prepare `backend/.env` and `frontend/.env` before starting Stage 3.
+4. **Next Immediate Action:** Begin **Stage 3 — Day 3 Lead Intake** (scaffold Express API Gateway `backend/`, React Form `frontend/`, and WF01 Webhook Trigger JSON synced via `sync-workflows.ts`).
+5. **Key Reference Files:** `AGENTS.md`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/scripts/sync-workflows.ts`, `database/policies/001_rls_and_grants.sql`.
 
 ---
 
 ## AI Development Setup Stages (4-Stage Implementation Plan)
 
 - [x] **Stage 1 — Foundation:** Core `.md` context system, ADRs, API/RLS contract, testing spec, `.env.example` templates, Git workflow committed.
-- [ ] **Stage 2 — AI Dev Environment:** `.agents/rules/`, `.agents/skills/`, additive SQL migration, Supabase `dev`+`test` verified, `n8n/scripts/sync-workflows.ts` tested against local n8n REST API.
+- [x] **Stage 2 — AI Dev Environment:** `.agents/rules/`, `.agents/skills/`, additive SQL migration `002`, RLS & grants SQL `001`, and `n8n/scripts/sync-workflows.ts` verified against local n8n REST API.
 - [ ] **Stage 3 — Development Workflow (Days 3–13):** Full-stack + 4 n8n workflows + Supabase RLS + Hybrid Testing report (`e2e-report.md`).
 - [ ] **Stage 4 — Optimization & Portfolio Handover (Day 14):** Prune unused rules/skills, sanitize n8n JSON, sync Portfolio docs, finalize `README.md`, record 60–90s demo, tag `v1.0.0`.
 
