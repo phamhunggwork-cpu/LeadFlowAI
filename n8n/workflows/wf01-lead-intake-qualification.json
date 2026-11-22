@@ -1,0 +1,76 @@
+{
+  "name": "WF01 - Lead Intake & Qualification",
+  "description": "Receives authenticated website lead inquiries from Express POST /api/leads, returns HTTP 202 acceptance, and orchestrates validation, AI qualification, deterministic scoring, HubSpot sync, and Slack alerts.",
+  "nodes": [
+    {
+      "id": "75843a47-ce6f-41f3-b2ef-1ae197fef532",
+      "name": "Receive Lead Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "14f8a9ac-6889-4ac1-9fda-4bcd9ee3d104",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "x-webhook-secret"
+        }
+      }
+    },
+    {
+      "id": "632b2c9f-5dcf-42a9-afc5-c3703095d555",
+      "name": "Acknowledge Lead Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, status: \"accepted\", workflow: \"wf01-lead-intake-qualification\", submission_id: $(\"Receive Lead Intake Webhook\").item.json.body?.submission_id ?? null, received_at: DateTime.now().toISO() } }}",
+        "options": {
+          "responseCode": 202
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Lead Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Lead Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "tags": [
+    {
+      "name": "leadflow-ai"
+    },
+    {
+      "name": "wf01"
+    },
+    {
+      "name": "intake"
+    }
+  ]
+}
