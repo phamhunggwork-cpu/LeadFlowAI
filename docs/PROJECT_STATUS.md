@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 3 (Lead Intake)
+- **Current Roadmap Day:** Day 4 (Validation & Duplicate Prevention)
 - **Active Git Branch:** `feat/day3-lead-intake`
-- **Overall Progress:** `9 / 51` roadmap tasks completed (`17.6%`)
-- **Last Updated:** 2026-11-22
+- **Overall Progress:** `10 / 51` roadmap tasks completed (`19.6%`)
+- **Last Updated:** 2026-11-23
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 3 Task 2 (`backend/` Express API Gateway) — scaffolded TypeScript Express gateway (`backend/src/{app,server}.ts`, `config/env.ts`, `validators/lead.validator.ts`, `services/n8n.service.ts`, `controllers/lead.controller.ts`, `routes/lead.routes.ts`, `middleware/errorHandler.ts`, `utils/apiResponse.ts`). Verified `tsc --noEmit` + `build` PASS and 7/7 live API + n8n WF01 roundtrip checks PASS (`200` health, `400` Zod validation, `202` explicit & auto `submission_id` forwarded to WF01 with `x-webhook-secret`, `404` unknown route).
-2. **Current State / Branch:** Branch `feat/day3-lead-intake` has Day 3 Task 1 (`WF01`) committed and Day 3 Task 2 (`backend/`) verified & ready to commit.
-3. **Blockers / Pending Actions:** No blockers for Day 3. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) confirm LLM provider (`OpenAI gpt-4o-mini` in ADRs vs `DEEPSEEK_API_KEY` in `backend/.env`) before Day 5; (c) note `TEST_SUPABASE_URL` currently points to `leadflow-ai` (separate test project or strict `TEST_RUN_PREFIX` cleanup needed before Day 13).
-4. **Next Immediate Action:** Complete **Day 3 — Lead Intake** Task 3: scaffold React + Vite + Tailwind Lead Intake Form (`frontend/`) connected to `POST ${VITE_API_BASE_URL}/api/leads`.
-5. **Key Reference Files:** `AGENTS.md`, `docs/architecture/03-api-and-rls-contract.md`, `backend/src/validators/lead.validator.ts`, `frontend/.env.example`.
+1. **Last Completed:** Day 3 — Lead Intake (`3 / 3` COMPLETED): built React + TypeScript + Vite + Tailwind Lead Intake Form (`frontend/`), Express API Gateway (`backend/`), and `WF01` Webhook Trigger (`n8n/workflows/wf01-lead-intake-qualification.json`). Verified `typecheck`, `build`, zero-secret scan, and live browser E2E (`http://localhost:5173` → `POST /api/leads` → `WF01` execution `success`, HTTP `202` with `submission_id`).
+2. **Current State / Branch:** Branch `feat/day3-lead-intake` has Day 3 Tasks 1 & 2 committed; Task 3 (`frontend/`) + updated `docs/PROJECT_STATUS.md` are verified and ready to commit (then merge `feat/day3-lead-intake` into `main` per `docs/setup/git-workflow.md`).
+3. **Blockers / Pending Actions:** No blockers for Day 4. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) confirm LLM provider (`OpenAI gpt-4o-mini` in ADRs vs `DEEPSEEK_API_KEY` in `backend/.env`) before Day 5; (c) note `TEST_SUPABASE_URL` currently points to `leadflow-ai` (separate test project or strict `TEST_RUN_PREFIX` cleanup needed before Day 13).
+4. **Next Immediate Action:** Commit `frontend/` + `docs/PROJECT_STATUS.md`, merge `feat/day3-lead-intake` → `main`, then create branch `feat/day4-validation-dedup` for **Day 4 — Validation & Duplicate Prevention** (`n8n/code-nodes/` normalization, `submission_id` deduplication, Supabase `contacts` upsert + `inquiries` insert).
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`9 / 51`)
+## 14-Day Master Roadmap Checklist (`10 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -42,8 +42,8 @@
 - [x] Create Supabase project and initial 6 tables (`database/schema/LeadFlowAI.sql`)
 - [x] Create test form (`tests/test-form.html`) and simulated mock dataset (`test-data/mock-leads.json`)
 
-### Day 3 — Lead Intake (`2 / 3`)
-- [ ] Create React form (`frontend/`)
+### Day 3 — Lead Intake (`3 / 3`)
+- [x] Create React form (`frontend/`)
 - [x] Create Node.js Express API Gateway calling authenticated n8n webhook (`backend/`)
 - [x] Create WF01 Webhook Trigger in n8n (`n8n/workflows/wf01-lead-intake-qualification.json`)
 
