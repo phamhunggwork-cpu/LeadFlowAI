@@ -1649,6 +1649,275 @@
       ],
       "parameters": {},
       "notes": "Single convergence exit for Stage 4 HubSpot CRM sync (ready for Day 8 Slack Notification stage)."
+    },
+    {
+      "id": "387d7f3f-41d7-419d-9d6c-c7ed6e2fb7c8",
+      "name": "If Slack Alert Eligible",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        7760,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "or",
+          "conditions": [
+            {
+              "id": "slack-qualified-check",
+              "leftValue": "={{ $('Score Lead Deterministically').item.json.qualification_status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "qualified"
+            },
+            {
+              "id": "slack-needs-review-check",
+              "leftValue": "={{ $('Score Lead Deterministically').item.json.qualification_status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "needs_review"
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      },
+      "notes": "ADR-003: alerts Slack ONLY for qualified ([HIGH PRIORITY]) and needs_review ([NEEDS REVIEW]) leads; skips not_qualified."
+    },
+    {
+      "id": "27b84ae5-0d13-42b8-be17-269d1e933a66",
+      "name": "Send Slack Lead Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        8040,
+        -220
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "blocksUi": "={{ (() => {\n  // Build Slack Block Kit alert payload per ADR-003 ([HIGH PRIORITY] / [NEEDS REVIEW])\n  const lead = $('Normalize Lead Data').item.json;\n  const ai = $('Validate AI Output Schema').item.json.analysis;\n  const score = $('Score Lead Deterministically').item.json;\n  const inquiryId = $('Insert Inquiry').item.json.id;\n  const isQualified = score.qualification_status === 'qualified';\n  const badge = isQualified ? '[HIGH PRIORITY]' : '[NEEDS REVIEW]';\n  const emoji = isQualified ? '🔥' : '🟡';\n  const title = isQualified\n    ? `${emoji} ${badge} New Qualified Lead`\n    : `${emoji} ${badge} Lead Needs Manual Triage`;\n\n  const budgetStr =\n    lead.budget_min !== null && lead.budget_max !== null\n      ? `${lead.budget_currency} ${lead.budget_min.toLocaleString('en-US')}–${lead.budget_max.toLocaleString('en-US')}`\n      : lead.budget_max !== null\n        ? `${lead.budget_currency} up to ${lead.budget_max.toLocaleString('en-US')}`\n        : lead.budget_min !== null\n          ? `${lead.budget_currency} ${lead.budget_min.toLocaleString('en-US')}+`\n          : 'Undisclosed';\n  const timelineStr = lead.timeline_weeks ? `${lead.timeline_weeks} weeks` : 'Unspecified';\n\n  // Safely check HubSpot sync ID even if HubSpot errored on continueErrorOutput\n  let hsRaw = null;\n  try {\n    const hsItem = $('Upsert HubSpot Contact').first();\n    hsRaw = hsItem?.json?.vid ?? hsItem?.json?.id ?? null;\n  } catch (_err) {\n    hsRaw = null;\n  }\n  const hubspotStr = hsRaw ? `Synced (ID: ${hsRaw})` : 'Pending / Sync failed';\n  const reviewUrl = `http://localhost:5173/inquiries/${inquiryId}`;\n  const missing = Array.isArray(ai.missing_information) ? ai.missing_information : [];\n\n  const blocks = [\n    {\n      type: 'header',\n      text: { type: 'plain_text', text: title.slice(0, 150), emoji: true }\n    },\n    {\n      type: 'section',\n      fields: [\n        { type: 'mrkdwn', text: `*Prospect:*\\n${lead.full_name}${lead.company_name ? ` (${lead.company_name})` : ''}` },\n        { type: 'mrkdwn', text: `*Email:*\\n${lead.email}` },\n        { type: 'mrkdwn', text: `*Score & Priority:*\\n${score.qualification_score}/100 (${String(score.priority || '').toUpperCase()})` },\n        { type: 'mrkdwn', text: `*Detected Service:*\\n${ai.detected_service}` },\n        { type: 'mrkdwn', text: `*Budget & Timeline:*\\n${budgetStr} | ${timelineStr}` },\n        { type: 'mrkdwn', text: `*HubSpot CRM:*\\n${hubspotStr}` }\n      ]\n    },\n    {\n      type: 'section',\n      text: { type: 'mrkdwn', text: `*AI Summary:*\\n${ai.project_summary}` }\n    }\n  ];\n\n  if (missing.length > 0) {\n    blocks.push({\n      type: 'section',\n      text: {\n        type: 'mrkdwn',\n        text: `*Missing Information:*\\n${missing.map((m) => `• ${m}`).join('\\n')}`\n      }\n    });\n  }\n\n  blocks.push(\n    { type: 'divider' },\n    {\n      type: 'section',\n      text: {\n        type: 'mrkdwn',\n        text: `👉 *Review & Approve Email Draft:* <${reviewUrl}|Open Inquiry in Dashboard>`\n      }\n    },\n    {\n      type: 'context',\n      elements: [\n        { type: 'mrkdwn', text: `Inquiry ID: \\`${inquiryId}\\` | Submission: \\`${lead.submission_id}\\` | Approval: \\`pending\\`` }\n      ]\n    }\n  );\n\n  return { blocks };\n})() }}",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#sales-leads"
+        },
+        "messageType": "block",
+        "operation": "post",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true,
+          "unfurl_links": false,
+          "unfurl_media": false
+        },
+        "resource": "message",
+        "select": "channel",
+        "text": "={{ `${$('Score Lead Deterministically').item.json.qualification_status === 'qualified' ? '[HIGH PRIORITY]' : '[NEEDS REVIEW]'} ${$('Normalize Lead Data').item.json.full_name} (${$('Normalize Lead Data').item.json.company_name || $('Normalize Lead Data').item.json.email}) — Score ${$('Score Lead Deterministically').item.json.qualification_score}/100 | Review: http://localhost:5173/inquiries/${$('Insert Inquiry').item.json.id}` }}"
+      },
+      "notes": "Posts structured Block Kit notification to #sales-leads with ADR-003 badge, AI summary, HubSpot ID, and dashboard review link.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "webhookId": "d8cb99fc-7774-4f1b-a88f-8e00a77736bb",
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_SLACK_CREDENTIAL_ID",
+          "name": "Slack LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "f43897a3-338d-4702-afb9-a133d9f1d965",
+      "name": "Log Slack Alert Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        8320,
+        -220
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "slack_alert_sent"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { channel: $('Send Slack Lead Alert').item.json.channel ?? '#sales-leads', message_ts: $('Send Slack Lead Alert').item.json.ts ?? $('Send Slack Lead Alert').item.json.message_timestamp ?? null, badge: $('Score Lead Deterministically').item.json.qualification_status === 'qualified' ? '[HIGH PRIORITY]' : '[NEEDS REVIEW]', qualification_status: $('Score Lead Deterministically').item.json.qualification_status, qualification_score: $('Score Lead Deterministically').item.json.qualification_score, dashboard_url: `http://localhost:5173/inquiries/${$('Insert Inquiry').item.json.id}` } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "notes": "Records Slack delivery metadata (channel, message_ts, badge, review URL) in activity_logs.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "6d51b82f-6ba2-4700-80b3-4626e3580149",
+      "name": "Log Slack Alert Skipped",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        8040,
+        40
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "slack_alert_skipped"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { reason: 'not_qualified', qualification_status: $('Score Lead Deterministically').item.json.qualification_status, qualification_score: $('Score Lead Deterministically').item.json.qualification_score } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "notes": "ADR-003 audit trail when Slack notification is skipped for not_qualified leads.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "1dee6115-fee7-4356-8208-ae6ef3bdf5a5",
+      "name": "Record Slack Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        8320,
+        220
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.submission_id }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "WF01 - Lead Intake & Qualification"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ typeof $json.error === 'object' && $json.error?.node?.name ? String($json.error.node.name) : 'Send Slack Lead Alert' }}"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ (() => {\n  // Support both string errors and Error objects from continueErrorOutput\n  const err = $json.error;\n  const msg = typeof err === 'string'\n    ? err\n    : (err?.message ?? $json.message ?? 'Slack lead alert failed');\n  return String(msg).slice(0, 1000);\n})() }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "workflow_errors"
+      },
+      "notes": "Captures Slack API failures in workflow_errors without impacting Supabase persistence or HubSpot sync.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "0692471f-18d1-441c-ae12-027cfa6f0ad9",
+      "name": "Log Slack Alert Failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        8600,
+        220
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "slack_alert_failed"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { workflow_error_id: $('Record Slack Error').item.json.id, node_name: $('Record Slack Error').item.json.node_name, error_message: $('Record Slack Error').item.json.error_message } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "notes": "Writes activity_logs audit record referencing the workflow_errors row when Slack alert fails.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
     }
   ],
   "connections": {
@@ -2189,6 +2458,64 @@
         [
           {
             "node": "CRM Sync Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRM Sync Complete": {
+      "main": [
+        [
+          {
+            "node": "If Slack Alert Eligible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Slack Alert Eligible": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Lead Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Slack Alert Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Slack Lead Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Slack Alert Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Slack Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Slack Error": {
+      "main": [
+        [
+          {
+            "node": "Log Slack Alert Failed",
             "type": "main",
             "index": 0
           }
