@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 7 (HubSpot Integration)
-- **Active Git Branch:** `main` *(Day 6 merged; next: `feat/day7-hubspot-sync`)*
-- **Overall Progress:** `21 / 51` roadmap tasks completed (`41.2%`)
+- **Current Roadmap Day:** Day 8 (Slack Notification)
+- **Active Git Branch:** `main` *(Day 7 merged; next: `feat/day8-slack-alerts`)*
+- **Overall Progress:** `25 / 51` roadmap tasks completed (`49.0%`)
 - **Last Updated:** 2026-11-23
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 6 — Lead Scoring & Routing (`3 / 3` COMPLETED & merged into `main`): built & unit-tested pure deterministic scoring engine [`n8n/code-nodes/score-lead.js`](../n8n/code-nodes/score-lead.js) (9/9 PASS: 0–100 rubric, deal-breakers, missing-info floor, borderline budget cap), deployed & published 33-node `WF01` (`Mynf0z0HIudjtNXF`, active version `4f264885-5a67-4bb9-9a23-3f0c01449c23`, 3 stage groups) with `Score Lead Deterministically`, `Save Lead Analysis & Score` (`score_breakdown` JSONB per ADR-004), `Update Inquiry Qualification`, 3-way `Route by Qualification Status` Switch (+ `Unexpected Status` fallback), and `Create Pending Email Draft` (`email_messages` `status='pending_approval'`, `idempotency_key='email:<inquiry_id>:initial'` for `qualified`/`needs_review` ONLY per ADR-002), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 4/4 live E2E cases (`TC01` score=100 `qualified`, `TC04` score=60 `needs_review`, `TC05` score=29 `not_qualified`, `TC07` score=23 `not_qualified`) + clean DB teardown.
-2. **Current State / Branch:** `main` is clean with Days 1–6 merged (`feat/day6-lead-scoring` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
-3. **Blockers / Pending Actions:** Before Day 7 live tests, create a HubSpot Developer / Private App access token and add the `HubSpot App Token` credential in n8n UI. Deferred non-blocking items: (a) create Slack credential before Day 8; (b) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (c) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Create HubSpot Private App token + n8n credential, create branch `feat/day7-hubspot-sync` from `main`, and implement **Day 7 — HubSpot Integration** (`0 / 4`: upsert HubSpot contact by normalized email, persist `contacts.hubspot_contact_id`, verify field mapping and error handling).
-5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/code-nodes/score-lead.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
+1. **Last Completed:** Day 7 — HubSpot Integration (`4 / 4` COMPLETED & merged into `main`): verified live HubSpot Private App credential (`HubSpot Service Key account`, `hubspotAppToken`), added 9 nodes + Stage 4 group `Sync Contact to HubSpot CRM` to `WF01` (`Mynf0z0HIudjtNXF`, 42 nodes, 4 stage groups, active version `d2b7e8ba-90ec-4539-92ee-46951beea9c0`): `Ready for CRM Sync` (Stage 3 exit), `If Sync Eligible (Not Spam)`, `Upsert HubSpot Contact` (normalized email upsert + mapped `firstName`/`lastName`/`companyName`/`phoneNumber`/`leadStatus`/`lifeCycleStage`/`message`, `retryOnFail` 3x5s, `onError: continueErrorOutput`), `Save HubSpot Contact ID`, `Log HubSpot Contact Synced`, `Log HubSpot Sync Skipped`, `Record HubSpot Error`, `Log HubSpot Sync Failed`, and `CRM Sync Complete` (Stage 4 exit ready for Day 8). Exported sanitized [`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json) (0 leaks). Dual-verified 5/5 live E2E cases (`TC01` new contact `is_new=true` `OPEN`/`salesqualifiedlead`, `TC09` existing contact `is_new=false` reused same `contact_id` & `hubspot_contact_id`, `TC04` `phone=null` `IN_PROGRESS`/`lead`, `TC07` spam skipped `hubspot_contact_id=null`, AC5 HubSpot API 400 error isolated in `workflow_errors` preserving `lead_analyses` & `email_messages`) + clean Supabase teardown.
+2. **Current State / Branch:** `main` is clean with Days 1–7 merged (`feat/day7-hubspot-sync` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready). Note: 2 synthetic test contacts (`605978010326`, `605916024526` with `.example.com` emails) remain in HubSpot portal for visual inspection / manual deletion.
+3. **Blockers / Pending Actions:** Before Day 8 live tests, create a Slack credential (`slackApi` Bot Token with `chat:write` + `channels:read`, or `slackOAuth2Api`) in n8n UI and invite the bot to the target sales channel. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Create Slack credential in n8n UI, create branch `feat/day8-slack-alerts` from `main`, and implement **Day 8 — Slack Notification** (`0 / 3`: connect after `CRM Sync Complete`, alert ONLY for `qualified` `[HIGH PRIORITY]` and `needs_review` `[NEEDS REVIEW]` per ADR-003 with dashboard review link).
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md` (ADR-003), `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`21 / 51`)
+## 14-Day Master Roadmap Checklist (`25 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -64,11 +64,11 @@
 - [x] Build `Qualified` / `Needs Review` / `Not Qualified` branches
 - [x] Save score, `score_breakdown`, and initial operational draft (`email_messages`) to Supabase
 
-### Day 7 — HubSpot Integration (`0 / 4`)
-- [ ] Configure HubSpot Developer / Private App access
-- [ ] Configure HubSpot credential in n8n
-- [ ] Create or update HubSpot contact by normalized email and save `hubspot_contact_id`
-- [ ] Verify field mapping and API error handling
+### Day 7 — HubSpot Integration (`4 / 4`)
+- [x] Configure HubSpot Developer / Private App access
+- [x] Configure HubSpot credential in n8n
+- [x] Create or update HubSpot contact by normalized email and save `hubspot_contact_id`
+- [x] Verify field mapping and API error handling
 
 ### Day 8 — Slack Notification (`0 / 3`)
 - [ ] Create Slack app / webhook credential
