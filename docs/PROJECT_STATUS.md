@@ -5,18 +5,18 @@
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
 - **Current Roadmap Day:** Day 4 (Validation & Duplicate Prevention)
-- **Active Git Branch:** `feat/day3-lead-intake`
-- **Overall Progress:** `10 / 51` roadmap tasks completed (`19.6%`)
+- **Active Git Branch:** `feat/day4-validation-dedup`
+- **Overall Progress:** `11 / 51` roadmap tasks completed (`21.6%`)
 - **Last Updated:** 2026-11-23
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 3 — Lead Intake (`3 / 3` COMPLETED): built React + TypeScript + Vite + Tailwind Lead Intake Form (`frontend/`), Express API Gateway (`backend/`), and `WF01` Webhook Trigger (`n8n/workflows/wf01-lead-intake-qualification.json`). Verified `typecheck`, `build`, zero-secret scan, and live browser E2E (`http://localhost:5173` → `POST /api/leads` → `WF01` execution `success`, HTTP `202` with `submission_id`).
-2. **Current State / Branch:** Branch `feat/day3-lead-intake` has Day 3 Tasks 1 & 2 committed; Task 3 (`frontend/`) + updated `docs/PROJECT_STATUS.md` are verified and ready to commit (then merge `feat/day3-lead-intake` into `main` per `docs/setup/git-workflow.md`).
+1. **Last Completed:** Day 4 Task 1 (`1 / 4`) — hardened Express Zod schema ([`backend/src/validators/lead.validator.ts`](../backend/src/validators/lead.validator.ts)) with single-issue-per-field checks, explicit type errors, `NUMERIC(12,2)` budget bounds, and empty-timestamp handling; added defense-in-depth `Validate Lead Payload` (Set IIFE) + `If Payload Valid` + HTTP 400 `Return Validation Error` gate in live `WF01` (`Mynf0z0HIudjtNXF`) and exported sanitized JSON to [`n8n/workflows/wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json). Verified `typecheck`, `build`, `leadflow-n8n-sanitize`, 11/11 Express API tests, and 6/6 direct WF01 webhook tests.
+2. **Current State / Branch:** Active branch `feat/day4-validation-dedup` (branched from `main` @ `b6c3e49`) has Day 4 Task 1 changes verified and ready to commit (`main` is ahead of `origin/main` — push when ready).
 3. **Blockers / Pending Actions:** No blockers for Day 4. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) confirm LLM provider (`OpenAI gpt-4o-mini` in ADRs vs `DEEPSEEK_API_KEY` in `backend/.env`) before Day 5; (c) note `TEST_SUPABASE_URL` currently points to `leadflow-ai` (separate test project or strict `TEST_RUN_PREFIX` cleanup needed before Day 13).
-4. **Next Immediate Action:** Commit `frontend/` + `docs/PROJECT_STATUS.md`, merge `feat/day3-lead-intake` → `main`, then create branch `feat/day4-validation-dedup` for **Day 4 — Validation & Duplicate Prevention** (`n8n/code-nodes/` normalization, `submission_id` deduplication, Supabase `contacts` upsert + `inquiries` insert).
+4. **Next Immediate Action:** Continue **Day 4 — Validation & Duplicate Prevention** (`1 / 4`) on `feat/day4-validation-dedup`: build JS normalization Code node (`n8n/code-nodes/`), `submission_id` deduplication/idempotency check, and Supabase `contacts` upsert + `inquiries` insert.
 5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`10 / 51`)
+## 14-Day Master Roadmap Checklist (`11 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -47,8 +47,8 @@
 - [x] Create Node.js Express API Gateway calling authenticated n8n webhook (`backend/`)
 - [x] Create WF01 Webhook Trigger in n8n (`n8n/workflows/wf01-lead-intake-qualification.json`)
 
-### Day 4 — Validation & Duplicate Prevention (`0 / 4`)
-- [ ] Validate required fields and email format (Zod + WF01)
+### Day 4 — Validation & Duplicate Prevention (`1 / 4`)
+- [x] Validate required fields and email format (Zod + WF01)
 - [ ] Normalize data via JS Code node (`n8n/code-nodes/`)
 - [ ] Generate/enforce unique `submission_id` and idempotency check
 - [ ] Save `contacts` (normalized email upsert) and `inquiries` into Supabase
