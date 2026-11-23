@@ -1,6 +1,6 @@
 {
   "name": "WF01 - Lead Intake & Qualification",
-  "description": "Receives authenticated website lead inquiries from Express POST /api/leads, validates required fields and email format, returns HTTP 202 acceptance (or HTTP 400 validation error), and orchestrates AI qualification, deterministic scoring, HubSpot sync, and Slack alerts.",
+  "description": "Receives authenticated website lead inquiries from Express POST /api/leads, validates required fields and email format, normalizes lead payloads, returns HTTP 202 acceptance (or HTTP 400 validation error), and orchestrates AI qualification, deterministic scoring, HubSpot sync, and Slack alerts.",
   "nodes": [
     {
       "id": "75843a47-ce6f-41f3-b2ef-1ae197fef532",
@@ -86,17 +86,33 @@
       }
     },
     {
+      "id": "948d97e4-0314-4ad9-b6a1-92590a5f20aa",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        -100
+      ],
+      "notes": "Pure deterministic lead payload normalizer synced with n8n/code-nodes/normalize-lead.js.",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Synced with n8n/code-nodes/normalize-lead.js (deterministic normalization for WF01)\nfunction generateRandomHex8() {\n  if (\n    typeof globalThis.crypto !== 'undefined' &&\n    typeof globalThis.crypto.getRandomValues === 'function'\n  ) {\n    const bytes = new Uint8Array(4);\n    globalThis.crypto.getRandomValues(bytes);\n    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');\n  }\n  return Math.floor(Math.random() * 0x100000000)\n    .toString(16)\n    .padStart(8, '0');\n}\n\nfunction generateSubmissionId(nowMs) {\n  const ts = nowMs.toString(36);\n  const rand = generateRandomHex8();\n  return `sub_${ts}_${rand}`;\n}\n\nfunction normalizeInlineText(value) {\n  if (typeof value !== 'string') return null;\n  const collapsed = value.trim().replace(/\\s+/g, ' ');\n  return collapsed.length > 0 ? collapsed : null;\n}\n\nfunction normalizeMultilineText(value) {\n  if (typeof value !== 'string') return '';\n  return value\n    .replace(/\\r\\n?/g, '\\n')\n    .split('\\n')\n    .map((line) => line.replace(/[ \\t]+$/g, ''))\n    .join('\\n')\n    .trim();\n}\n\nfunction normalizeBudgetAmount(value) {\n  if (typeof value !== 'number' || !Number.isFinite(value)) return null;\n  return Math.round(value * 100) / 100;\n}\n\nfunction normalizeTimelineWeeks(value) {\n  if (typeof value !== 'number' || !Number.isFinite(value)) return null;\n  const rounded = Math.trunc(value);\n  return rounded > 0 ? rounded : null;\n}\n\nfunction normalizeBudgetCurrency(value) {\n  if (typeof value !== 'string') return 'USD';\n  const normalized = value.trim().toUpperCase();\n  return /^[A-Z]{3}$/.test(normalized) ? normalized : 'USD';\n}\n\nconst now = DateTime.now().toUTC();\nconst nowIso = now.toISO();\nconst nowMs = now.toMillis();\nconst webhookItems = $('Receive Lead Intake Webhook').all();\n\nreturn webhookItems.map((item) => {\n  const rawBody = item.json?.body;\n  const body =\n    rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)\n      ? rawBody\n      : {};\n\n  const existingSubmissionId = normalizeInlineText(body.submission_id);\n  const submissionIdGenerated = existingSubmissionId === null;\n  const submissionId = existingSubmissionId ?? generateSubmissionId(nowMs);\n\n  const consentToEmail = body.consent_to_email === true;\n  const rawConsentTs = normalizeInlineText(body.consent_timestamp);\n\n  return {\n    json: {\n      submission_id: submissionId,\n      submission_id_generated: submissionIdGenerated,\n      full_name: normalizeInlineText(body.full_name) ?? '',\n      email:\n        typeof body.email === 'string' ? body.email.trim().toLowerCase() : '',\n      company_name: normalizeInlineText(body.company_name),\n      phone: normalizeInlineText(body.phone),\n      service_type: normalizeInlineText(body.service_type),\n      budget_min: normalizeBudgetAmount(body.budget_min),\n      budget_max: normalizeBudgetAmount(body.budget_max),\n      budget_currency: normalizeBudgetCurrency(body.budget_currency),\n      timeline_weeks: normalizeTimelineWeeks(body.timeline_weeks),\n      project_description: normalizeMultilineText(body.project_description),\n      consent_to_email: consentToEmail,\n      consent_timestamp: consentToEmail ? (rawConsentTs ?? nowIso) : null,\n      consent_source:\n        normalizeInlineText(body.consent_source) ?? 'website_contact_form',\n      lead_status: 'new',\n      priority: 'low',\n      approval_status: 'not_required',\n      followup_status: 'not_eligible',\n      received_at: nowIso,\n    },\n  };\n});"
+      }
+    },
+    {
       "id": "632b2c9f-5dcf-42a9-afc5-c3703095d555",
       "name": "Acknowledge Lead Accepted",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        780,
+        1040,
         -100
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: true, status: \"accepted\", workflow: \"wf01-lead-intake-qualification\", submission_id: $(\"Receive Lead Intake Webhook\").item.json.body?.submission_id ?? null, received_at: DateTime.now().toISO() } }}",
+        "responseBody": "={{ { ok: true, status: \"accepted\", workflow: \"wf01-lead-intake-qualification\", submission_id: $(\"Normalize Lead Data\").item.json.submission_id, received_at: $(\"Normalize Lead Data\").item.json.received_at } }}",
         "options": {
           "responseCode": 202
         }
@@ -147,7 +163,7 @@
       "main": [
         [
           {
-            "node": "Acknowledge Lead Accepted",
+            "node": "Normalize Lead Data",
             "type": "main",
             "index": 0
           }
@@ -155,6 +171,17 @@
         [
           {
             "node": "Return Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Lead Accepted",
             "type": "main",
             "index": 0
           }
