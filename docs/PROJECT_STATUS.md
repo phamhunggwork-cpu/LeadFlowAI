@@ -15,8 +15,8 @@
 
 1. **Last Completed:** Day 4 — Validation & Duplicate Prevention (`4 / 4` COMPLETED & merged into `main`): hardened Express Zod validation + HTTP `409 CONFLICT` passthrough (`backend/`), built pure deterministic normalizer [`n8n/code-nodes/normalize-lead.js`](../n8n/code-nodes/normalize-lead.js), deployed & published full 17-node `WF01` (`Mynf0z0HIudjtNXF`, active version `fc852be5-73db-400e-848b-9a0b30015f78`) with Set IIFE validation, JS normalization, `submission_id` deduplication (`409 CONFLICT`), normalized-email `contacts` lookup/upsert, `inquiries` + `activity_logs` persistence on Supabase (`Supabase LeadFlow`), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 4/4 E2E cases (API + Supabase DB) and cleaned test rows back to baseline (`1` contact, `2` inquiries, `0` activity_logs).
 2. **Current State / Branch:** `main` is clean with Days 1–4 merged (`feat/day4-validation-dedup` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
-3. **Blockers / Pending Actions:** Before starting Day 5, confirm LLM provider (`OpenAI gpt-4o-mini` in ADR-001 vs `DEEPSEEK_API_KEY` in `backend/.env`) and create the corresponding LLM credential in n8n UI. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Confirm LLM provider & n8n credential, create branch `feat/day5-ai-qualification` from `main`, and implement **Day 5 — AI Qualification** (`0 / 4`: `n8n/prompts/` system prompt, Structured Outputs strict JSON, safe malformed/timeout handling).
+3. **Blockers / Pending Actions:** LLM provider switched to **DeepSeek (`deepseek-chat`)** per ADR-007; create `DeepSeek LeadFlow` (`DeepSeek API` / `deepSeekApi`) credential in n8n UI before running Day 5 live tests. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Create `DeepSeek LeadFlow` credential in n8n UI, create branch `feat/day5-ai-qualification` from `main`, and implement **Day 5 — AI Qualification** (`0 / 4`: `n8n/prompts/` system prompt, DeepSeek `deepseek-chat` JSON mode + strict JS schema gate, safe malformed/timeout handling).
 5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/code-nodes/normalize-lead.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
@@ -55,7 +55,7 @@
 
 ### Day 5 — AI Qualification (`0 / 4`)
 - [ ] Write system prompt and extraction criteria (`n8n/prompts/`)
-- [ ] Connect OpenAI `gpt-4o-mini` API
+- [ ] Connect DeepSeek `deepseek-chat` API (ADR-007)
 - [ ] Enforce strict JSON schema output (no score generation by LLM)
 - [ ] Validate and safely handle malformed/timeout AI responses
 

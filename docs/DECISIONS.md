@@ -10,6 +10,7 @@
 | ADR-004 | 2026-11-22 | Accepted | Additive Migration for `score_breakdown` & `updated_at` Triggers |
 | ADR-005 | 2026-11-22 | Accepted | n8n Workflow Deployment via Public REST API First (MCP Optional Later) |
 | ADR-006 | 2026-11-22 | Accepted | Hybrid Testing Strategy (Vitest Integration + `test-form.html`) |
+| ADR-007 | 2026-11-23 | Accepted | Switch Primary LLM Provider to DeepSeek (`deepseek-chat`) |
 
 ---
 
@@ -53,3 +54,12 @@
 - **Context:** Solo portfolio needs strong engineering proof of API + workflow + DB correctness without brittle browser test maintenance.
 - **Decision:** Combine **12–15 automated Vitest integration tests** (calling real Express API / n8n webhooks, polling a dedicated Supabase test environment, asserting both HTTP responses and DB rows, and cleaning up uniquely tagged test records) with **3–5 manual scenarios** in `tests/test-form.html`.
 - **Consequences:** High reliability on core business guarantees (dedup, consent, HITL approval, error isolation) with zero risk to production data.
+
+## ADR-007: Switch Primary LLM Provider to DeepSeek (`deepseek-chat`)
+- **Context:** ADR-001 selected OpenAI `gpt-4o-mini` while keeping prompts and JSON schemas provider-agnostic. The developer elected to use DeepSeek (`DEEPSEEK_API_KEY`) for development and demo runs, and local n8n includes the native **DeepSeek Chat Model** node (`@n8n/n8n-nodes-langchain.lmChatDeepSeek`, credential type `deepSeekApi`).
+- **Decision:**
+  - Use **DeepSeek `deepseek-chat`** via native n8n `@n8n/n8n-nodes-langchain.lmChatDeepSeek` (`responseFormat: 'json_object'`, low temperature `0.2`, bounded timeout/retries) paired with `@n8n/n8n-nodes-langchain.chainLlm`.
+  - Because DeepSeek uses JSON Mode (`json_object`) rather than OpenAI's `json_schema` `strict: true`, WF01 MUST enforce a **deterministic JavaScript schema validation gate** on the parsed JSON output before any Supabase write (`lead_analyses` / `email_messages`).
+  - Maintain the non-negotiable AI vs. Deterministic Split: DeepSeek performs semantic extraction, spam suspicion, and email drafting ONLY — never computing `qualification_score`, `qualification_status`, or `priority`.
+  - Prompt and output schema remain provider-agnostic so OpenAI `gpt-4o-mini` or Gemini can still be swapped in without changing downstream scoring or DB persistence.
+- **Consequences:** Lower development/test API cost using the developer's existing DeepSeek key; strict schema gate guarantees identical safety against malformed AI JSON; portfolio narrative in `docs/portfolio/*` will be synced on Day 14.

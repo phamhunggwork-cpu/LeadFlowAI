@@ -103,9 +103,9 @@ Error response:
 
 ---
 
-## 4. AI Structured Output Schema (`gpt-4o-mini`, `strict: true`)
+## 4. AI Structured Output Schema (`DeepSeek deepseek-chat`, JSON Mode + Strict JS Schema Gate — ADR-007)
 
-Stored in `lead_analyses` (`model_name`, `prompt_version`). **LLM MUST NOT return `qualification_score`, `qualification_status`, or `priority`.**
+Stored in `lead_analyses` (`model_name = 'deepseek-chat'`, `prompt_version`). **LLM MUST NOT return `qualification_score`, `qualification_status`, or `priority`.** WF01 requests `responseFormat = 'json_object'` and validates every field and enum with a deterministic JS schema gate before writing to Supabase.
 
 ```json
 {

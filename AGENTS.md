@@ -10,7 +10,7 @@
 - **Backend (`backend/`):** Node.js + Express + TypeScript (`tsx`) + Zod + Helmet + `@supabase/supabase-js`.
 - **Database & Auth (`database/`):** Supabase PostgreSQL (6 tables) + **Supabase Auth & RLS**.
 - **Automation (`n8n/`):** 4 modular n8n workflows (`WF01`–`WF04`) stored as versioned JSON + separated JS code nodes & prompts, deployed to local n8n via official **n8n Public REST API** (`POST/PUT /api/v1/workflows`).
-- **External Integrations:** OpenAI `gpt-4o-mini` (Structured Outputs strict JSON), Resend API (`Idempotency-Key`), HubSpot CRM, Slack.
+- **External Integrations:** DeepSeek `deepseek-chat` (JSON mode + strict JS schema gate per ADR-007; provider-agnostic prompt/schema), Resend API (`Idempotency-Key`), HubSpot CRM, Slack.
 - **Testing (`tests/`):** Hybrid Testing — Node.js + **Vitest** (12–15 automated integration tests with async polling on dedicated Supabase test env) + `tests/test-form.html` (3–5 manual scenarios).
 
 ## 3. Non-Negotiable Invariants
