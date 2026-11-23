@@ -17,6 +17,8 @@ export async function submitLeadController(
       status: 'accepted',
       workflow: upstream.workflow,
       received_at: upstream.receivedAt,
+      ...(upstream.contactId ? { contact_id: upstream.contactId } : {}),
+      ...(upstream.inquiryId ? { inquiry_id: upstream.inquiryId } : {}),
     });
   } catch (err: unknown) {
     next(err);
