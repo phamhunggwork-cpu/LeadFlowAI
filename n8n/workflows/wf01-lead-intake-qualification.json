@@ -3,15 +3,6 @@
   "description": "Receives authenticated website lead inquiries from Express POST /api/leads, returns HTTP 202 acceptance, and orchestrates validation, AI qualification, deterministic scoring, HubSpot sync, and Slack alerts.",
   "nodes": [
     {
-      "id": "75843a47-ce6f-41f3-b2ef-1ae197fef532",
-      "name": "Receive Lead Intake Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.2,
-      "position": [
-        0,
-        0
-      ],
-      "webhookId": "14f8a9ac-6889-4ac1-9fda-4bcd9ee3d104",
       "parameters": {
         "httpMethod": "POST",
         "path": "lead-intake",
@@ -19,6 +10,15 @@
         "responseMode": "responseNode",
         "options": {}
       },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "75843a47-ce6f-41f3-b2ef-1ae197fef532",
+      "name": "Receive Lead Intake Webhook",
+      "webhookId": "14f8a9ac-6889-4ac1-9fda-4bcd9ee3d104",
       "credentials": {
         "httpHeaderAuth": {
           "id": "REPLACE_WITH_HEADER_AUTH_CREDENTIAL_ID",
@@ -27,21 +27,562 @@
       }
     },
     {
+      "parameters": {
+        "options": {
+          "responseCode": 202
+        },
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, status: \"accepted\", workflow: \"wf01-lead-intake-qualification\", submission_id: $(\"Normalize Lead Data\").item.json.submission_id, contact_id: $(\"Resolve Contact ID\").item.json.contact_id, inquiry_id: $(\"Insert Inquiry\").item.json.id, received_at: $(\"Normalize Lead Data\").item.json.received_at } }}"
+      },
       "id": "632b2c9f-5dcf-42a9-afc5-c3703095d555",
       "name": "Acknowledge Lead Accepted",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        260,
+        3120,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lead-validation-result",
+              "name": "result",
+              "type": "object",
+              "value": "={{ (() => {\n  // LeadFlow AI WF01 defense-in-depth payload validator (matches 03-api-and-rls-contract.md)\n  const rawBody = $('Receive Lead Intake Webhook').item.json.body;\n  const MAX_BUDGET = 9999999999.99;\n  const EMAIL_REGEX = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\n  const CURRENCY_REGEX = /^[A-Z]{3}$/;\n  const ISO_OFFSET_REGEX = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/;\n  const REQUIRED_SCHEMA = {\n    type: 'object',\n    required: ['full_name', 'email', 'project_description'],\n    properties: {\n      submission_id: { type: ['string', 'null'], maxLength: 120, description: 'Unique idempotency key for this inquiry submission' },\n      full_name: { type: 'string', minLength: 1, maxLength: 200, description: 'Lead full name (required)' },\n      email: { type: 'string', format: 'email', maxLength: 254, description: 'Valid contact email address (required)' },\n      company_name: { type: ['string', 'null'], maxLength: 200, description: 'Company or organization name' },\n      phone: { type: ['string', 'null'], maxLength: 50, description: 'Contact phone number' },\n      service_type: { type: ['string', 'null'], maxLength: 150, description: 'Requested Veloce Digital service category' },\n      budget_min: { type: ['number', 'null'], minimum: 0, maximum: MAX_BUDGET, description: 'Minimum project budget' },\n      budget_max: { type: ['number', 'null'], minimum: 0, maximum: MAX_BUDGET, description: 'Maximum project budget (>= budget_min)' },\n      budget_currency: { type: ['string', 'null'], pattern: '^[A-Z]{3}$', default: 'USD', description: '3-letter ISO currency code' },\n      timeline_weeks: { type: ['integer', 'null'], minimum: 1, description: 'Expected timeline in whole weeks (> 0)' },\n      project_description: { type: 'string', minLength: 10, maxLength: 5000, description: 'Detailed project scope (at least 10 characters)' },\n      consent_to_email: { type: 'boolean', default: false, description: 'Explicit opt-in for automated follow-up emails' },\n      consent_timestamp: { type: ['string', 'null'], format: 'date-time', description: 'ISO 8601 timestamp with timezone offset' },\n      consent_source: { type: ['string', 'null'], maxLength: 100, default: 'website_contact_form', description: 'Source of lead consent' }\n    }\n  };\n\n  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {\n    return {\n      valid: false,\n      validationError: 'Request body must be a JSON object',\n      details: [{ field: 'body', message: 'Request body must be a JSON object' }],\n      requiredSchema: REQUIRED_SCHEMA\n    };\n  }\n\n  const body = rawBody;\n  const errors = [];\n  const addError = (field, message) => errors.push({ field, message });\n\n  // Required: full_name\n  if (body.full_name === undefined || body.full_name === null) {\n    addError('full_name', 'full_name is required');\n  } else if (typeof body.full_name !== 'string') {\n    addError('full_name', 'full_name must be a string');\n  } else {\n    const trimmed = body.full_name.trim();\n    if (trimmed.length < 1) addError('full_name', 'full_name is required');\n    else if (trimmed.length > 200) addError('full_name', 'full_name must be at most 200 characters');\n  }\n\n  // Required: email\n  if (body.email === undefined || body.email === null) {\n    addError('email', 'email is required');\n  } else if (typeof body.email !== 'string') {\n    addError('email', 'email must be a string');\n  } else {\n    const trimmed = body.email.trim();\n    if (trimmed.length < 1) addError('email', 'email is required');\n    else if (trimmed.length > 254) addError('email', 'email must be at most 254 characters');\n    else if (!EMAIL_REGEX.test(trimmed) || /\\.\\./.test(trimmed)) addError('email', 'Invalid email format');\n  }\n\n  // Required: project_description\n  if (body.project_description === undefined || body.project_description === null) {\n    addError('project_description', 'project_description is required');\n  } else if (typeof body.project_description !== 'string') {\n    addError('project_description', 'project_description must be a string');\n  } else {\n    const trimmed = body.project_description.trim();\n    if (trimmed.length < 1) addError('project_description', 'project_description is required');\n    else if (trimmed.length < 10) addError('project_description', 'project_description must be at least 10 characters');\n    else if (trimmed.length > 5000) addError('project_description', 'project_description must be at most 5000 characters');\n  }\n\n  // Optional strings with max length\n  const optionalStrings = [\n    ['submission_id', 120],\n    ['company_name', 200],\n    ['phone', 50],\n    ['service_type', 150],\n    ['consent_source', 100]\n  ];\n  for (const [field, maxLen] of optionalStrings) {\n    const val = body[field];\n    if (val === undefined || val === null) continue;\n    if (typeof val !== 'string') addError(field, field + ' must be a string');\n    else if (val.trim().length > maxLen) addError(field, field + ' must be at most ' + maxLen + ' characters');\n  }\n\n  // Optional budgets\n  let validBudgetMin = null;\n  if (body.budget_min !== undefined && body.budget_min !== null) {\n    const v = body.budget_min;\n    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > MAX_BUDGET) {\n      addError('budget_min', 'budget_min must be a finite non-negative number');\n    } else {\n      validBudgetMin = v;\n    }\n  }\n\n  let validBudgetMax = null;\n  if (body.budget_max !== undefined && body.budget_max !== null) {\n    const v = body.budget_max;\n    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > MAX_BUDGET) {\n      addError('budget_max', 'budget_max must be a finite non-negative number');\n    } else {\n      validBudgetMax = v;\n    }\n  }\n\n  if (validBudgetMin !== null && validBudgetMax !== null && validBudgetMax < validBudgetMin) {\n    addError('budget_max', 'budget_max must be greater than or equal to budget_min');\n  }\n\n  // Optional budget_currency\n  if (body.budget_currency !== undefined && body.budget_currency !== null) {\n    if (typeof body.budget_currency !== 'string') {\n      addError('budget_currency', 'budget_currency must be a 3-letter ISO currency code');\n    } else {\n      const normalizedCurrency = body.budget_currency.trim().toUpperCase();\n      if (normalizedCurrency.length > 0 && !CURRENCY_REGEX.test(normalizedCurrency)) {\n        addError('budget_currency', 'budget_currency must be a 3-letter ISO currency code');\n      }\n    }\n  }\n\n  // Optional timeline_weeks (positive integer)\n  if (body.timeline_weeks !== undefined && body.timeline_weeks !== null) {\n    const v = body.timeline_weeks;\n    if (typeof v !== 'number' || !Number.isFinite(v) || Math.floor(v) !== v || v <= 0) {\n      addError('timeline_weeks', 'timeline_weeks must be a positive integer');\n    }\n  }\n\n  // Optional consent_to_email\n  if (body.consent_to_email !== undefined && body.consent_to_email !== null && typeof body.consent_to_email !== 'boolean') {\n    addError('consent_to_email', 'consent_to_email must be a boolean');\n  }\n\n  // Optional consent_timestamp\n  if (body.consent_timestamp !== undefined && body.consent_timestamp !== null) {\n    if (typeof body.consent_timestamp !== 'string') {\n      addError('consent_timestamp', 'consent_timestamp must be a valid ISO 8601 timestamp');\n    } else {\n      const trimmedTs = body.consent_timestamp.trim();\n      if (trimmedTs.length > 0 && (!ISO_OFFSET_REGEX.test(trimmedTs) || !DateTime.fromISO(trimmedTs, { setZone: true }).isValid)) {\n        addError('consent_timestamp', 'consent_timestamp must be a valid ISO 8601 timestamp');\n      }\n    }\n  }\n\n  if (errors.length === 0) {\n    return { valid: true, validationError: null, details: [], requiredSchema: null };\n  }\n\n  return {\n    valid: false,\n    validationError: errors[0].message,\n    details: errors,\n    requiredSchema: REQUIRED_SCHEMA\n  };\n})() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "82b798b5-9c29-4e6f-be51-ce227384ec27",
+      "name": "Validate Lead Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        256,
         0
       ],
+      "notes": "Defense-in-depth payload schema validation matching 03-api-and-rls-contract.md (Set IIFE pattern)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "lead-payload-valid",
+              "leftValue": "={{ $('Validate Lead Payload').item.json.result.valid }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e0945350-7675-463e-a8c3-805359fcf356",
+      "name": "If Payload Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        528,
+        0
+      ]
+    },
+    {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: true, status: \"accepted\", workflow: \"wf01-lead-intake-qualification\", submission_id: $(\"Receive Lead Intake Webhook\").item.json.body?.submission_id ?? null, received_at: DateTime.now().toISO() } }}",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"VALIDATION_ERROR\", message: $(\"Validate Lead Payload\").item.json.result.validationError, details: $(\"Validate Lead Payload\").item.json.result.details }, request_schema: $(\"Validate Lead Payload\").item.json.result.requiredSchema } }}",
         "options": {
-          "responseCode": 202
+          "responseCode": 400
         }
+      },
+      "id": "8a533588-32a3-4a7a-8ed1-2fbfbfae8f60",
+      "name": "Return Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Synced with n8n/code-nodes/normalize-lead.js (deterministic normalization for WF01)\nfunction generateRandomHex8() {\n  if (\n    typeof globalThis.crypto !== 'undefined' &&\n    typeof globalThis.crypto.getRandomValues === 'function'\n  ) {\n    const bytes = new Uint8Array(4);\n    globalThis.crypto.getRandomValues(bytes);\n    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');\n  }\n  return Math.floor(Math.random() * 0x100000000)\n    .toString(16)\n    .padStart(8, '0');\n}\n\nfunction generateSubmissionId(nowMs) {\n  const ts = nowMs.toString(36);\n  const rand = generateRandomHex8();\n  return `sub_${ts}_${rand}`;\n}\n\nfunction normalizeInlineText(value) {\n  if (typeof value !== 'string') return null;\n  const collapsed = value.trim().replace(/\\s+/g, ' ');\n  return collapsed.length > 0 ? collapsed : null;\n}\n\nfunction normalizeMultilineText(value) {\n  if (typeof value !== 'string') return '';\n  return value\n    .replace(/\\r\\n?/g, '\\n')\n    .split('\\n')\n    .map((line) => line.replace(/[ \\t]+$/g, ''))\n    .join('\\n')\n    .trim();\n}\n\nfunction normalizeBudgetAmount(value) {\n  if (typeof value !== 'number' || !Number.isFinite(value)) return null;\n  return Math.round(value * 100) / 100;\n}\n\nfunction normalizeTimelineWeeks(value) {\n  if (typeof value !== 'number' || !Number.isFinite(value)) return null;\n  const rounded = Math.trunc(value);\n  return rounded > 0 ? rounded : null;\n}\n\nfunction normalizeBudgetCurrency(value) {\n  if (typeof value !== 'string') return 'USD';\n  const normalized = value.trim().toUpperCase();\n  return /^[A-Z]{3}$/.test(normalized) ? normalized : 'USD';\n}\n\nconst now = DateTime.now().toUTC();\nconst nowIso = now.toISO();\nconst nowMs = now.toMillis();\nconst webhookItems = $('Receive Lead Intake Webhook').all();\n\nreturn webhookItems.map((item) => {\n  const rawBody = item.json?.body;\n  const body =\n    rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)\n      ? rawBody\n      : {};\n\n  const existingSubmissionId = normalizeInlineText(body.submission_id);\n  const submissionIdGenerated = existingSubmissionId === null;\n  const submissionId = existingSubmissionId ?? generateSubmissionId(nowMs);\n\n  const consentToEmail = body.consent_to_email === true;\n  const rawConsentTs = normalizeInlineText(body.consent_timestamp);\n\n  return {\n    json: {\n      submission_id: submissionId,\n      submission_id_generated: submissionIdGenerated,\n      full_name: normalizeInlineText(body.full_name) ?? '',\n      email:\n        typeof body.email === 'string' ? body.email.trim().toLowerCase() : '',\n      company_name: normalizeInlineText(body.company_name),\n      phone: normalizeInlineText(body.phone),\n      service_type: normalizeInlineText(body.service_type),\n      budget_min: normalizeBudgetAmount(body.budget_min),\n      budget_max: normalizeBudgetAmount(body.budget_max),\n      budget_currency: normalizeBudgetCurrency(body.budget_currency),\n      timeline_weeks: normalizeTimelineWeeks(body.timeline_weeks),\n      project_description: normalizeMultilineText(body.project_description),\n      consent_to_email: consentToEmail,\n      consent_timestamp: consentToEmail ? (rawConsentTs ?? nowIso) : null,\n      consent_source:\n        normalizeInlineText(body.consent_source) ?? 'website_contact_form',\n      lead_status: 'new',\n      priority: 'low',\n      approval_status: 'not_required',\n      followup_status: 'not_eligible',\n      received_at: nowIso,\n    },\n  };\n});"
+      },
+      "id": "948d97e4-0314-4ad9-b6a1-92590a5f20aa",
+      "name": "Normalize Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        -96
+      ],
+      "notes": "Pure deterministic lead payload normalizer synced with n8n/code-nodes/normalize-lead.js."
+    },
+    {
+      "id": "998c28f4-a21d-43a6-8a0b-26f2b73ecb29",
+      "name": "Check Duplicate Submission",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        -100
+      ],
+      "parameters": {
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "submission_id",
+              "keyValue": "={{ $('Normalize Lead Data').item.json.submission_id }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "returnAll": false,
+        "tableId": "inquiries"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Idempotency check on inquiries.submission_id before any writes or AI calls.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "25062eb1-5e1c-4a28-884b-acfc113833b4",
+      "name": "If Duplicate Submission",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1300,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "dup-submission-check",
+              "leftValue": "={{ $('Check Duplicate Submission').item.json.id ?? '' }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
       }
+    },
+    {
+      "id": "e42596d5-80c3-4cf3-834c-5282f0068694",
+      "name": "Return Duplicate Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1560,
+        -300
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": 409
+        },
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"CONFLICT\", message: \"Duplicate submission_id\", details: [{ field: \"submission_id\", message: \"An inquiry with this submission_id already exists\" }] }, existing_inquiry_id: $(\"Check Duplicate Submission\").item.json.id ?? null } }}"
+      }
+    },
+    {
+      "id": "31318deb-a6ca-4e61-ae2e-fe31a7ff846c",
+      "name": "Lookup Contact by Email",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        -100
+      ],
+      "parameters": {
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "email",
+              "keyValue": "={{ $('Normalize Lead Data').item.json.email }}"
+            }
+          ]
+        },
+        "limit": 1,
+        "matchType": "allFilters",
+        "operation": "getAll",
+        "resource": "row",
+        "returnAll": false,
+        "tableId": "contacts"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Looks up existing contact by normalized lowercase email (matches contacts_email_unique).",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "aa33d4f0-6c05-481e-a966-700c12214686",
+      "name": "If Contact Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1820,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "contact-exists-check",
+              "leftValue": "={{ $('Lookup Contact by Email').item.json.id ?? '' }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cc1e5750-140b-4d3e-a4ef-400dc0fb4834",
+      "name": "Update Existing Contact",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        -220
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "full_name",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.full_name }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.company_name ?? $('Lookup Contact by Email').item.json.company_name ?? null }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.phone ?? $('Lookup Contact by Email').item.json.phone ?? null }}"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $('Lookup Contact by Email').item.json.id }}"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "resource": "row",
+        "tableId": "contacts"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Updates existing contact while preserving non-null company_name and phone when omitted.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "6b4503b1-f784-4f17-860e-27f495d82893",
+      "name": "Create Contact",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        20
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "full_name",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.full_name }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.email }}"
+            },
+            {
+              "fieldId": "company_name",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.company_name }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.phone }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "contacts"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "8dcc768b-264b-468a-bd5e-9f61aabbe7af",
+      "name": "Resolve Contact ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2340,
+        -100
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "resolved-contact-id",
+              "name": "contact_id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "resolved-contact-email",
+              "name": "contact_email",
+              "type": "string",
+              "value": "={{ $json.email }}"
+            },
+            {
+              "id": "resolved-contact-existed",
+              "name": "contact_existed",
+              "type": "boolean",
+              "value": "={{ Boolean($('Lookup Contact by Email').item.json.id) }}"
+            }
+          ]
+        },
+        "mode": "manual",
+        "options": {}
+      },
+      "notes": "Unifies Update Existing Contact and Create Contact branches into one stable named reference."
+    },
+    {
+      "id": "50c5d028-48f0-498a-8270-0cec3feed2e6",
+      "name": "Insert Inquiry",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        -100
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "contact_id",
+              "fieldValue": "={{ $('Resolve Contact ID').item.json.contact_id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.submission_id }}"
+            },
+            {
+              "fieldId": "service_type",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.service_type }}"
+            },
+            {
+              "fieldId": "budget_min",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.budget_min }}"
+            },
+            {
+              "fieldId": "budget_max",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.budget_max }}"
+            },
+            {
+              "fieldId": "budget_currency",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.budget_currency }}"
+            },
+            {
+              "fieldId": "timeline_weeks",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.timeline_weeks }}"
+            },
+            {
+              "fieldId": "project_description",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.project_description }}"
+            },
+            {
+              "fieldId": "consent_to_email",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.consent_to_email }}"
+            },
+            {
+              "fieldId": "consent_timestamp",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.consent_timestamp }}"
+            },
+            {
+              "fieldId": "consent_source",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.consent_source }}"
+            },
+            {
+              "fieldId": "lead_status",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.lead_status }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.priority }}"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.approval_status }}"
+            },
+            {
+              "fieldId": "followup_status",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.followup_status }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "inquiries"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "47c5b401-bca3-41b5-ae4b-9cb6ccdabf44",
+      "name": "Log Inquiry Received",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        -100
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "inquiry_received"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { submission_id: $('Normalize Lead Data').item.json.submission_id, contact_id: $('Resolve Contact ID').item.json.contact_id, contact_existed: $('Resolve Contact ID').item.json.contact_existed, consent_to_email: $('Normalize Lead Data').item.json.consent_to_email, consent_source: $('Normalize Lead Data').item.json.consent_source } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "f338918b-3f80-4cef-bcff-f0ace2759700",
+      "name": "Return Database Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2080,
+        320
+      ],
+      "parameters": {
+        "options": {
+          "responseCode": "={{ /23505|duplicate key/i.test(String($json.error?.message ?? $json.message ?? '')) ? 409 : 502 }}"
+        },
+        "respondWith": "json",
+        "responseBody": "={{ (() => { const msg = String($json.error?.message ?? $json.message ?? ''); const isDup = /23505|duplicate key/i.test(msg); if (isDup) { return { ok: false, data: null, error: { code: 'CONFLICT', message: 'Duplicate submission_id', details: [{ field: 'submission_id', message: 'An inquiry with this submission_id already exists' }] } }; } return { ok: false, data: null, error: { code: 'UPSTREAM_ERROR', message: 'Unable to persist lead intake record' } }; })() }}"
+      },
+      "notes": "Returns HTTP 409 if Postgres unique violation (race-condition duplicate submission_id) or sanitized HTTP 502 otherwise."
     }
   ],
   "connections": {
@@ -49,7 +590,202 @@
       "main": [
         [
           {
+            "node": "Validate Lead Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Payload": {
+      "main": [
+        [
+          {
+            "node": "If Payload Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Payload Valid": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Check Duplicate Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Duplicate Submission": {
+      "main": [
+        [
+          {
+            "node": "If Duplicate Submission",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Database Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Duplicate Submission": {
+      "main": [
+        [
+          {
+            "node": "Return Duplicate Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup Contact by Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Contact by Email": {
+      "main": [
+        [
+          {
+            "node": "If Contact Exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Database Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Contact Exists": {
+      "main": [
+        [
+          {
+            "node": "Update Existing Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Contact": {
+      "main": [
+        [
+          {
+            "node": "Resolve Contact ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Database Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Contact": {
+      "main": [
+        [
+          {
+            "node": "Resolve Contact ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Database Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Contact ID": {
+      "main": [
+        [
+          {
+            "node": "Insert Inquiry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Inquiry": {
+      "main": [
+        [
+          {
+            "node": "Log Inquiry Received",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Database Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Inquiry Received": {
+      "main": [
+        [
+          {
             "node": "Acknowledge Lead Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Database Error",
             "type": "main",
             "index": 0
           }
@@ -64,13 +800,13 @@
   },
   "tags": [
     {
-      "name": "leadflow-ai"
+      "name": "intake"
     },
     {
       "name": "wf01"
     },
     {
-      "name": "intake"
+      "name": "leadflow-ai"
     }
   ]
 }

@@ -1,11 +1,26 @@
 import { env } from '../config/env.js';
-import { AppError } from '../utils/apiResponse.js';
+import { AppError, type ApiErrorDetail } from '../utils/apiResponse.js';
 import type { NormalizedLeadPayload } from '../validators/lead.validator.js';
 
 export interface Wf01ForwardResult {
   httpStatus: number;
   workflow: string;
   receivedAt: string;
+  contactId?: string;
+  inquiryId?: string;
+}
+
+function parseJsonObject(rawText: string): Record<string, unknown> {
+  if (!rawText) return {};
+  try {
+    const json = JSON.parse(rawText) as unknown;
+    if (json && typeof json === 'object' && !Array.isArray(json)) {
+      return json as Record<string, unknown>;
+    }
+  } catch {
+    // Non-JSON upstream body
+  }
+  return {};
 }
 
 export async function forwardLeadToWf01(
@@ -37,24 +52,32 @@ export async function forwardLeadToWf01(
   }
 
   const rawText = await response.text();
+  const parsedBody = parseJsonObject(rawText);
+
+  if (response.status === 409) {
+    const upstreamError =
+      parsedBody.error &&
+      typeof parsedBody.error === 'object' &&
+      !Array.isArray(parsedBody.error)
+        ? (parsedBody.error as Record<string, unknown>)
+        : {};
+    const message =
+      typeof upstreamError.message === 'string' && upstreamError.message.trim()
+        ? upstreamError.message
+        : 'Duplicate submission_id';
+    const details = Array.isArray(upstreamError.details)
+      ? (upstreamError.details as ApiErrorDetail[])
+      : [{ field: 'submission_id', message: 'An inquiry with this submission_id already exists' }];
+
+    throw new AppError(409, 'CONFLICT', message, details);
+  }
+
   if (!response.ok) {
     throw new AppError(
       502,
       'UPSTREAM_ERROR',
       `Lead intake workflow rejected the request (upstream HTTP ${response.status})`,
     );
-  }
-
-  let parsedBody: Record<string, unknown> = {};
-  if (rawText) {
-    try {
-      const json = JSON.parse(rawText) as unknown;
-      if (json && typeof json === 'object' && !Array.isArray(json)) {
-        parsedBody = json as Record<string, unknown>;
-      }
-    } catch {
-      // Upstream returned 2xx with non-JSON body; still treat as accepted
-    }
   }
 
   return {
@@ -67,5 +90,11 @@ export async function forwardLeadToWf01(
       typeof parsedBody.received_at === 'string'
         ? parsedBody.received_at
         : new Date().toISOString(),
+    ...(typeof parsedBody.contact_id === 'string'
+      ? { contactId: parsedBody.contact_id }
+      : {}),
+    ...(typeof parsedBody.inquiry_id === 'string'
+      ? { inquiryId: parsedBody.inquiry_id }
+      : {}),
   };
 }
