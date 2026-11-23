@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 6 (Lead Scoring & Routing)
-- **Active Git Branch:** `main` *(Day 5 merged; next: `feat/day6-lead-scoring`)*
-- **Overall Progress:** `18 / 51` roadmap tasks completed (`35.3%`)
+- **Current Roadmap Day:** Day 7 (HubSpot Integration)
+- **Active Git Branch:** `main` *(Day 6 merged; next: `feat/day7-hubspot-sync`)*
+- **Overall Progress:** `21 / 51` roadmap tasks completed (`41.2%`)
 - **Last Updated:** 2026-11-23
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 5 — AI Qualification (`4 / 4` COMPLETED & merged into `main`): created versioned prompt [`n8n/prompts/wf01-lead-qualification-v1.md`](../n8n/prompts/wf01-lead-qualification-v1.md) (`v1.0.0`), built & unit-tested strict 8-key schema gate [`n8n/code-nodes/validate-ai-output.js`](../n8n/code-nodes/validate-ai-output.js) (6/6 PASS, blocks malformed JSON and forbidden LLM score keys), deployed & published async `AI Qualification (Async)` stage (10 nodes, total 27 nodes in 3 stage groups) on `WF01` (`Mynf0z0HIudjtNXF`, active version `86326ee1-0f45-41d6-842e-328527e20494`) using `DeepSeek LeadFlow` (`deepseek-chat`, `json_object`, `temperature=0.2`), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 5 live DeepSeek E2E cases + developer manual E2E verification.
-2. **Current State / Branch:** `main` is clean with Days 1–5 merged (`feat/day5-ai-qualification` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
-3. **Blockers / Pending Actions:** No blockers for Day 6. Deferred non-blocking items: (a) create HubSpot Private App credential in n8n UI before Day 7; (b) create Slack credential before Day 8; (c) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (d) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Create branch `feat/day6-lead-scoring` from `main` and implement **Day 6 — Lead Scoring & Routing** (`0 / 3`: `n8n/code-nodes/score-lead.js` 0–100 + deal-breaker overrides, `Qualified`/`Needs Review`/`Not Qualified` branches, save `score_breakdown` + `inquiries` status/priority/approval + operational `email_messages` draft).
-5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/prompts/wf01-lead-qualification-v1.md`, `n8n/code-nodes/validate-ai-output.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
+1. **Last Completed:** Day 6 — Lead Scoring & Routing (`3 / 3` COMPLETED & merged into `main`): built & unit-tested pure deterministic scoring engine [`n8n/code-nodes/score-lead.js`](../n8n/code-nodes/score-lead.js) (9/9 PASS: 0–100 rubric, deal-breakers, missing-info floor, borderline budget cap), deployed & published 33-node `WF01` (`Mynf0z0HIudjtNXF`, active version `4f264885-5a67-4bb9-9a23-3f0c01449c23`, 3 stage groups) with `Score Lead Deterministically`, `Save Lead Analysis & Score` (`score_breakdown` JSONB per ADR-004), `Update Inquiry Qualification`, 3-way `Route by Qualification Status` Switch (+ `Unexpected Status` fallback), and `Create Pending Email Draft` (`email_messages` `status='pending_approval'`, `idempotency_key='email:<inquiry_id>:initial'` for `qualified`/`needs_review` ONLY per ADR-002), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 4/4 live E2E cases (`TC01` score=100 `qualified`, `TC04` score=60 `needs_review`, `TC05` score=29 `not_qualified`, `TC07` score=23 `not_qualified`) + clean DB teardown.
+2. **Current State / Branch:** `main` is clean with Days 1–6 merged (`feat/day6-lead-scoring` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
+3. **Blockers / Pending Actions:** Before Day 7 live tests, create a HubSpot Developer / Private App access token and add the `HubSpot App Token` credential in n8n UI. Deferred non-blocking items: (a) create Slack credential before Day 8; (b) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (c) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Create HubSpot Private App token + n8n credential, create branch `feat/day7-hubspot-sync` from `main`, and implement **Day 7 — HubSpot Integration** (`0 / 4`: upsert HubSpot contact by normalized email, persist `contacts.hubspot_contact_id`, verify field mapping and error handling).
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/code-nodes/score-lead.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`18 / 51`)
+## 14-Day Master Roadmap Checklist (`21 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -59,10 +59,10 @@
 - [x] Enforce strict JSON schema output (no score generation by LLM)
 - [x] Validate and safely handle malformed/timeout AI responses
 
-### Day 6 — Lead Scoring & Routing (`0 / 3`)
-- [ ] Write deterministic JS scoring rules (0–100 + deal-breakers) in `n8n/code-nodes/`
-- [ ] Build `Qualified` / `Needs Review` / `Not Qualified` branches
-- [ ] Save score, `score_breakdown`, and initial operational draft (`email_messages`) to Supabase
+### Day 6 — Lead Scoring & Routing (`3 / 3`)
+- [x] Write deterministic JS scoring rules (0–100 + deal-breakers) in `n8n/code-nodes/`
+- [x] Build `Qualified` / `Needs Review` / `Not Qualified` branches
+- [x] Save score, `score_breakdown`, and initial operational draft (`email_messages`) to Supabase
 
 ### Day 7 — HubSpot Integration (`0 / 4`)
 - [ ] Configure HubSpot Developer / Private App access
