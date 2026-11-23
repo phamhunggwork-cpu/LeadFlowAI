@@ -1,6 +1,6 @@
 {
   "name": "WF01 - Lead Intake & Qualification",
-  "description": "Receives authenticated website lead inquiries from Express POST /api/leads, returns HTTP 202 acceptance, and orchestrates validation, AI qualification, deterministic scoring, HubSpot sync, and Slack alerts.",
+  "description": "Receives authenticated website lead inquiries from Express POST /api/leads, validates required fields and email format, returns HTTP 202 acceptance (or HTTP 400 validation error), and orchestrates AI qualification, deterministic scoring, HubSpot sync, and Slack alerts.",
   "nodes": [
     {
       "id": "75843a47-ce6f-41f3-b2ef-1ae197fef532",
@@ -27,19 +27,95 @@
       }
     },
     {
+      "id": "82b798b5-9c29-4e6f-be51-ce227384ec27",
+      "name": "Validate Lead Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        260,
+        0
+      ],
+      "notes": "Defense-in-depth payload schema validation matching 03-api-and-rls-contract.md (Set IIFE pattern).",
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "lead-validation-result",
+              "name": "result",
+              "type": "object",
+              "value": "={{ (() => {\n  // LeadFlow AI WF01 defense-in-depth payload validator (matches 03-api-and-rls-contract.md)\n  const rawBody = $('Receive Lead Intake Webhook').item.json.body;\n  const MAX_BUDGET = 9999999999.99;\n  const EMAIL_REGEX = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/;\n  const CURRENCY_REGEX = /^[A-Z]{3}$/;\n  const ISO_OFFSET_REGEX = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/;\n  const REQUIRED_SCHEMA = {\n    type: 'object',\n    required: ['full_name', 'email', 'project_description'],\n    properties: {\n      submission_id: { type: ['string', 'null'], maxLength: 120, description: 'Unique idempotency key for this inquiry submission' },\n      full_name: { type: 'string', minLength: 1, maxLength: 200, description: 'Lead full name (required)' },\n      email: { type: 'string', format: 'email', maxLength: 254, description: 'Valid contact email address (required)' },\n      company_name: { type: ['string', 'null'], maxLength: 200, description: 'Company or organization name' },\n      phone: { type: ['string', 'null'], maxLength: 50, description: 'Contact phone number' },\n      service_type: { type: ['string', 'null'], maxLength: 150, description: 'Requested Veloce Digital service category' },\n      budget_min: { type: ['number', 'null'], minimum: 0, maximum: MAX_BUDGET, description: 'Minimum project budget' },\n      budget_max: { type: ['number', 'null'], minimum: 0, maximum: MAX_BUDGET, description: 'Maximum project budget (>= budget_min)' },\n      budget_currency: { type: ['string', 'null'], pattern: '^[A-Z]{3}$', default: 'USD', description: '3-letter ISO currency code' },\n      timeline_weeks: { type: ['integer', 'null'], minimum: 1, description: 'Expected timeline in whole weeks (> 0)' },\n      project_description: { type: 'string', minLength: 10, maxLength: 5000, description: 'Detailed project scope (at least 10 characters)' },\n      consent_to_email: { type: 'boolean', default: false, description: 'Explicit opt-in for automated follow-up emails' },\n      consent_timestamp: { type: ['string', 'null'], format: 'date-time', description: 'ISO 8601 timestamp with timezone offset' },\n      consent_source: { type: ['string', 'null'], maxLength: 100, default: 'website_contact_form', description: 'Source of lead consent' }\n    }\n  };\n\n  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {\n    return {\n      valid: false,\n      validationError: 'Request body must be a JSON object',\n      details: [{ field: 'body', message: 'Request body must be a JSON object' }],\n      requiredSchema: REQUIRED_SCHEMA\n    };\n  }\n\n  const body = rawBody;\n  const errors = [];\n  const addError = (field, message) => errors.push({ field, message });\n\n  // Required: full_name\n  if (body.full_name === undefined || body.full_name === null) {\n    addError('full_name', 'full_name is required');\n  } else if (typeof body.full_name !== 'string') {\n    addError('full_name', 'full_name must be a string');\n  } else {\n    const trimmed = body.full_name.trim();\n    if (trimmed.length < 1) addError('full_name', 'full_name is required');\n    else if (trimmed.length > 200) addError('full_name', 'full_name must be at most 200 characters');\n  }\n\n  // Required: email\n  if (body.email === undefined || body.email === null) {\n    addError('email', 'email is required');\n  } else if (typeof body.email !== 'string') {\n    addError('email', 'email must be a string');\n  } else {\n    const trimmed = body.email.trim();\n    if (trimmed.length < 1) addError('email', 'email is required');\n    else if (trimmed.length > 254) addError('email', 'email must be at most 254 characters');\n    else if (!EMAIL_REGEX.test(trimmed) || /\\.\\./.test(trimmed)) addError('email', 'Invalid email format');\n  }\n\n  // Required: project_description\n  if (body.project_description === undefined || body.project_description === null) {\n    addError('project_description', 'project_description is required');\n  } else if (typeof body.project_description !== 'string') {\n    addError('project_description', 'project_description must be a string');\n  } else {\n    const trimmed = body.project_description.trim();\n    if (trimmed.length < 1) addError('project_description', 'project_description is required');\n    else if (trimmed.length < 10) addError('project_description', 'project_description must be at least 10 characters');\n    else if (trimmed.length > 5000) addError('project_description', 'project_description must be at most 5000 characters');\n  }\n\n  // Optional strings with max length\n  const optionalStrings = [\n    ['submission_id', 120],\n    ['company_name', 200],\n    ['phone', 50],\n    ['service_type', 150],\n    ['consent_source', 100]\n  ];\n  for (const [field, maxLen] of optionalStrings) {\n    const val = body[field];\n    if (val === undefined || val === null) continue;\n    if (typeof val !== 'string') addError(field, field + ' must be a string');\n    else if (val.trim().length > maxLen) addError(field, field + ' must be at most ' + maxLen + ' characters');\n  }\n\n  // Optional budgets\n  let validBudgetMin = null;\n  if (body.budget_min !== undefined && body.budget_min !== null) {\n    const v = body.budget_min;\n    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > MAX_BUDGET) {\n      addError('budget_min', 'budget_min must be a finite non-negative number');\n    } else {\n      validBudgetMin = v;\n    }\n  }\n\n  let validBudgetMax = null;\n  if (body.budget_max !== undefined && body.budget_max !== null) {\n    const v = body.budget_max;\n    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > MAX_BUDGET) {\n      addError('budget_max', 'budget_max must be a finite non-negative number');\n    } else {\n      validBudgetMax = v;\n    }\n  }\n\n  if (validBudgetMin !== null && validBudgetMax !== null && validBudgetMax < validBudgetMin) {\n    addError('budget_max', 'budget_max must be greater than or equal to budget_min');\n  }\n\n  // Optional budget_currency\n  if (body.budget_currency !== undefined && body.budget_currency !== null) {\n    if (typeof body.budget_currency !== 'string') {\n      addError('budget_currency', 'budget_currency must be a 3-letter ISO currency code');\n    } else {\n      const normalizedCurrency = body.budget_currency.trim().toUpperCase();\n      if (normalizedCurrency.length > 0 && !CURRENCY_REGEX.test(normalizedCurrency)) {\n        addError('budget_currency', 'budget_currency must be a 3-letter ISO currency code');\n      }\n    }\n  }\n\n  // Optional timeline_weeks (positive integer)\n  if (body.timeline_weeks !== undefined && body.timeline_weeks !== null) {\n    const v = body.timeline_weeks;\n    if (typeof v !== 'number' || !Number.isFinite(v) || Math.floor(v) !== v || v <= 0) {\n      addError('timeline_weeks', 'timeline_weeks must be a positive integer');\n    }\n  }\n\n  // Optional consent_to_email\n  if (body.consent_to_email !== undefined && body.consent_to_email !== null && typeof body.consent_to_email !== 'boolean') {\n    addError('consent_to_email', 'consent_to_email must be a boolean');\n  }\n\n  // Optional consent_timestamp\n  if (body.consent_timestamp !== undefined && body.consent_timestamp !== null) {\n    if (typeof body.consent_timestamp !== 'string') {\n      addError('consent_timestamp', 'consent_timestamp must be a valid ISO 8601 timestamp');\n    } else {\n      const trimmedTs = body.consent_timestamp.trim();\n      if (trimmedTs.length > 0 && (!ISO_OFFSET_REGEX.test(trimmedTs) || !DateTime.fromISO(trimmedTs, { setZone: true }).isValid)) {\n        addError('consent_timestamp', 'consent_timestamp must be a valid ISO 8601 timestamp');\n      }\n    }\n  }\n\n  if (errors.length === 0) {\n    return { valid: true, validationError: null, details: [], requiredSchema: null };\n  }\n\n  return {\n    valid: false,\n    validationError: errors[0].message,\n    details: errors,\n    requiredSchema: REQUIRED_SCHEMA\n  };\n})() }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e0945350-7675-463e-a8c3-805359fcf356",
+      "name": "If Payload Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 3,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "lead-payload-valid",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $('Validate Lead Payload').item.json.result.valid }}",
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
       "id": "632b2c9f-5dcf-42a9-afc5-c3703095d555",
       "name": "Acknowledge Lead Accepted",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        260,
-        0
+        780,
+        -100
       ],
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { ok: true, status: \"accepted\", workflow: \"wf01-lead-intake-qualification\", submission_id: $(\"Receive Lead Intake Webhook\").item.json.body?.submission_id ?? null, received_at: DateTime.now().toISO() } }}",
         "options": {
           "responseCode": 202
+        }
+      }
+    },
+    {
+      "id": "8a533588-32a3-4a7a-8ed1-2fbfbfae8f60",
+      "name": "Return Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        780,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"VALIDATION_ERROR\", message: $(\"Validate Lead Payload\").item.json.result.validationError, details: $(\"Validate Lead Payload\").item.json.result.details }, request_schema: $(\"Validate Lead Payload\").item.json.result.requiredSchema } }}",
+        "options": {
+          "responseCode": 400
         }
       }
     }
@@ -49,7 +125,36 @@
       "main": [
         [
           {
+            "node": "Validate Lead Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Payload": {
+      "main": [
+        [
+          {
+            "node": "If Payload Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Payload Valid": {
+      "main": [
+        [
+          {
             "node": "Acknowledge Lead Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Validation Error",
             "type": "main",
             "index": 0
           }
