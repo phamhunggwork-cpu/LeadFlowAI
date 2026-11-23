@@ -583,6 +583,398 @@
         "responseBody": "={{ (() => { const msg = String($json.error?.message ?? $json.message ?? ''); const isDup = /23505|duplicate key/i.test(msg); if (isDup) { return { ok: false, data: null, error: { code: 'CONFLICT', message: 'Duplicate submission_id', details: [{ field: 'submission_id', message: 'An inquiry with this submission_id already exists' }] } }; } return { ok: false, data: null, error: { code: 'UPSTREAM_ERROR', message: 'Unable to persist lead intake record' } }; })() }}"
       },
       "notes": "Returns HTTP 409 if Postgres unique violation (race-condition duplicate submission_id) or sanitized HTTP 502 otherwise."
+    },
+    {
+      "id": "126f651f-ee6f-4531-8dab-3c10b96a76e7",
+      "name": "Mark Inquiry Processing",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3400,
+        -100
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_status",
+              "fieldValue": "processing"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $('Insert Inquiry').item.json.id }}"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "resource": "row",
+        "tableId": "inquiries"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Transitions inquiry from new -> processing before calling DeepSeek (02-dataflow-and-states.md).",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "ba4f75c7-f641-43fc-a803-0dc6948a4a0d",
+      "name": "DeepSeek Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        3680,
+        120
+      ],
+      "parameters": {
+        "model": "deepseek-chat",
+        "options": {
+          "maxRetries": 2,
+          "responseFormat": "json_object",
+          "temperature": 0.2,
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "deepSeekApi": {
+          "id": "REPLACE_WITH_DEEPSEEK_CREDENTIAL_ID",
+          "name": "DeepSeek LeadFlow"
+        }
+      },
+      "notes": "DeepSeek deepseek-chat in JSON mode (ADR-007); bounded timeout and retries."
+    },
+    {
+      "id": "6694bd4a-4b05-4977-9b6e-652a93e66bc0",
+      "name": "Analyze Lead with DeepSeek",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        3680,
+        -100
+      ],
+      "parameters": {
+        "hasOutputParser": false,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a senior technical pre-sales analyst for Veloce Digital, a 12-person remote-first boutique web and software studio specializing in startups (Seed to Series A) and SMBs in the US and EU.\n\nYour ONLY job is semantic analysis, spam detection, and drafting a consultative initial reply email for incoming website lead inquiries.\nYou MUST NOT compute or output any numeric score, qualification status, or priority (deterministic software computes those downstream).\n\n## Veloce Digital Core Services (Choose EXACTLY ONE value for `detected_service`)\n1. \"Custom Web Applications & SaaS MVPs\" — React, Next.js, Node.js, PostgreSQL, dashboards, portals, billing, auth.\n2. \"B2B Marketing & Corporate Websites\" — modern B2B marketing sites, corporate websites, CMS/case studies, lead capture integrations.\n3. \"Web App Redesign & Performance Optimization\" — UX/UI modernization of existing web apps, speed/Core Web Vitals/frontend or backend optimization.\n4. \"Third-party API & Database Integrations\" — connecting CRMs, ERPs, e-commerce, payment systems, webhooks, scheduled sync jobs, PostgreSQL/data pipelines.\n5. \"Out of Scope\" — anything outside the 4 core services above, including:\n   - Native mobile-only apps (Swift iOS / Kotlin Android / watchOS with no web application)\n   - Minor WordPress/Wix template tweaks or small bug fixes under 5 hours\n   - Pure SEO/backlink sales, paid ads management, social media marketing, or graphic/logo design\n   - Unsolicited cold pitches, spam, agency subcontracting pitches, or recruitment inquiries\n\n## Assessment Guidelines\n- `detected_service`: Classify strictly from the actual project_description (do not blindly trust the user-selected service_type if project_description clearly describes an Out of Scope service or spam).\n- `project_summary`: 2-3 concise, factual sentences summarizing what the prospect wants to build, key technical requirements, and stated constraints. Never invent facts not present in the inquiry.\n- `missing_information`: JSON array of blocking pre-sales qualification gaps ONLY — critical omissions that prevent estimating viability before a call (specifically: undisclosed budget range, unspecified target timeline, vague/unclear core deliverables or features, or missing critical readiness like no designs or no API docs). Do NOT pad this list with routine discovery-call implementation details (e.g., Auth0 vs Clerk, Vercel vs AWS, post-MVP maintenance, hosting preferences). Return `[]` (or at most 1 item) when the prospect already provides clear deliverables, readiness (finalized PRD/wireframes or API docs), budget range, and timeline.\n- `scope_fit`:\n  - \"high\": Clearly aligns with one of Veloce Digital's 4 core services and realistic boutique studio scope.\n  - \"medium\": Partially aligns with a core service, borderline complexity, or unclear technical scope that needs clarification.\n  - \"low\": Out of Scope, spam, unrealistic scope-to-capability match, or not a genuine web/software project.\n- `spam_suspected`: `true` ONLY for unsolicited sales pitches (e.g., selling SEO backlinks, link building, lead lists, agency outreach), gibberish, or obvious bot spam. `false` for genuine (even low-budget or out-of-scope) project inquiries.\n- `clarity_score_band`:\n  - \"high\": Concrete technical goals, clear deliverables, and 0-1 blocking missing items.\n  - \"medium\": Understandable goal, but 2+ blocking scope, budget, or timeline details are missing.\n  - \"low\": Vague, one-liner, incoherent, or spam.\n- `draft_email_subject` & `draft_email_body`:\n  - Write as a Veloce Digital technical solutions lead.\n  - Tone: Consultative, direct, technical-friendly, zero generic sales fluff.\n  - Reference specific details from the prospect's inquiry (stack, features, or goals).\n  - If `missing_information` is non-empty, politely ask 1-2 targeted clarifying questions.\n  - Propose a focused 15-minute discovery call to confirm scope and next steps.\n  - For spam or clearly Out of Scope leads, still provide a short polite, professional decline/clarification draft.\n  - Sign off as \"Best,\\nVeloce Digital Team\".\n\n## Strict JSON Output Format\nReturn ONLY a single raw JSON object with EXACTLY these 8 keys (no markdown code fences, no prose before or after, no extra keys):\n\n{\n  \"detected_service\": \"Custom Web Applications & SaaS MVPs | B2B Marketing & Corporate Websites | Web App Redesign & Performance Optimization | Third-party API & Database Integrations | Out of Scope\",\n  \"project_summary\": \"string (2-3 concise sentences)\",\n  \"missing_information\": [\"string\"],\n  \"scope_fit\": \"high | medium | low\",\n  \"spam_suspected\": false,\n  \"clarity_score_band\": \"high | medium | low\",\n  \"draft_email_subject\": \"string\",\n  \"draft_email_body\": \"string\"\n}\n\nFORBIDDEN KEYS: Do NOT include `qualification_score`, `qualification_status`, `priority`, or any other extra keys.",
+              "type": "SystemMessagePromptTemplate"
+            }
+          ]
+        },
+        "needsFallback": false,
+        "promptType": "define",
+        "text": "=Analyze the following normalized lead inquiry for Veloce Digital and return ONLY the strict 8-key JSON object.\n\nLead Data (JSON):\n{{\n  JSON.stringify({\n    full_name: $('Normalize Lead Data').item.json.full_name,\n    company_name: $('Normalize Lead Data').item.json.company_name,\n    service_type_selected: $('Normalize Lead Data').item.json.service_type,\n    budget_min: $('Normalize Lead Data').item.json.budget_min,\n    budget_max: $('Normalize Lead Data').item.json.budget_max,\n    budget_currency: $('Normalize Lead Data').item.json.budget_currency,\n    timeline_weeks: $('Normalize Lead Data').item.json.timeline_weeks,\n    project_description: $('Normalize Lead Data').item.json.project_description\n  })\n}}"
+      },
+      "notes": "Runs versioned v1.0.0 Veloce Digital qualification prompt (n8n/prompts/wf01-lead-qualification-v1.md). Never computes score/priority.",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "3d041c95-2d66-4ea0-9541-945da1885091",
+      "name": "Validate AI Output Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3980,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// Synced with n8n/code-nodes/validate-ai-output.js (WF01 strict AI JSON schema gate)\nconst PROMPT_VERSION = 'v1.0.0';\nconst MODEL_NAME = 'deepseek-chat';\n\nconst ALLOWED_SERVICES = [\n  'Custom Web Applications & SaaS MVPs',\n  'B2B Marketing & Corporate Websites',\n  'Web App Redesign & Performance Optimization',\n  'Third-party API & Database Integrations',\n  'Out of Scope',\n];\n\nconst ALLOWED_BANDS = ['high', 'medium', 'low'];\nconst FORBIDDEN_KEYS = ['qualification_score', 'qualification_status', 'priority'];\n\nfunction stripMarkdownCodeFence(text) {\n  const trimmed = text.trim();\n  const fenceMatch = trimmed.match(/^```(?:json)?\\s*([\\s\\S]*?)\\s*```$/i);\n  return fenceMatch ? fenceMatch[1].trim() : trimmed;\n}\n\nfunction validateAiQualificationOutput(rawOutput) {\n  let parsed = null;\n  let rawPreview = '';\n\n  if (typeof rawOutput === 'string') {\n    rawPreview = rawOutput.slice(0, 300);\n    const cleaned = stripMarkdownCodeFence(rawOutput);\n    if (!cleaned) {\n      return {\n        valid: false,\n        model_name: MODEL_NAME,\n        prompt_version: PROMPT_VERSION,\n        error_code: 'MALFORMED_AI_JSON',\n        error_message: 'AI response text is empty',\n        errors: ['AI response text is empty'],\n        raw_preview: rawPreview,\n      };\n    }\n    try {\n      parsed = JSON.parse(cleaned);\n    } catch (err) {\n      return {\n        valid: false,\n        model_name: MODEL_NAME,\n        prompt_version: PROMPT_VERSION,\n        error_code: 'MALFORMED_AI_JSON',\n        error_message: 'Failed to parse AI JSON response: ' + (err && err.message ? err.message : 'SyntaxError'),\n        errors: ['Invalid JSON syntax from LLM'],\n        raw_preview: rawPreview,\n      };\n    }\n  } else if (rawOutput && typeof rawOutput === 'object' && !Array.isArray(rawOutput)) {\n    parsed = rawOutput;\n    rawPreview = JSON.stringify(rawOutput).slice(0, 300);\n  } else {\n    return {\n      valid: false,\n      model_name: MODEL_NAME,\n      prompt_version: PROMPT_VERSION,\n      error_code: 'MALFORMED_AI_JSON',\n      error_message: 'AI response must be a JSON string or object',\n      errors: ['AI response must be a JSON string or object'],\n      raw_preview: String(rawOutput ?? '').slice(0, 300),\n    };\n  }\n\n  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {\n    return {\n      valid: false,\n      model_name: MODEL_NAME,\n      prompt_version: PROMPT_VERSION,\n      error_code: 'MALFORMED_AI_JSON',\n      error_message: 'Parsed AI output must be a plain JSON object',\n      errors: ['Parsed AI output must be a plain JSON object'],\n      raw_preview: rawPreview,\n    };\n  }\n\n  const errors = [];\n\n  for (const forbidden of FORBIDDEN_KEYS) {\n    if (Object.prototype.hasOwnProperty.call(parsed, forbidden)) {\n      errors.push('Forbidden LLM scoring key present: ' + forbidden);\n    }\n  }\n\n  const detectedService = typeof parsed.detected_service === 'string' ? parsed.detected_service.trim() : '';\n  if (!ALLOWED_SERVICES.includes(detectedService)) {\n    errors.push('detected_service must be one of the 5 allowed categories (got \"' + String(parsed.detected_service ?? '') + '\")');\n  }\n\n  const projectSummary = typeof parsed.project_summary === 'string' ? parsed.project_summary.trim() : '';\n  if (projectSummary.length < 10 || projectSummary.length > 1200) {\n    errors.push('project_summary must be a string between 10 and 1200 characters');\n  }\n\n  const missingInformation = [];\n  if (!Array.isArray(parsed.missing_information)) {\n    errors.push('missing_information must be an array of strings');\n  } else if (parsed.missing_information.length > 15) {\n    errors.push('missing_information must contain at most 15 items');\n  } else {\n    for (let i = 0; i < parsed.missing_information.length; i++) {\n      const entry = parsed.missing_information[i];\n      if (typeof entry !== 'string' || !entry.trim()) {\n        errors.push('missing_information[' + i + '] must be a non-empty string');\n      } else {\n        missingInformation.push(entry.trim().slice(0, 200));\n      }\n    }\n  }\n\n  const scopeFit = typeof parsed.scope_fit === 'string' ? parsed.scope_fit.trim().toLowerCase() : '';\n  if (!ALLOWED_BANDS.includes(scopeFit)) {\n    errors.push('scope_fit must be high, medium, or low (got \"' + String(parsed.scope_fit ?? '') + '\")');\n  }\n\n  if (typeof parsed.spam_suspected !== 'boolean') {\n    errors.push('spam_suspected must be a boolean');\n  }\n\n  const clarityScoreBand = typeof parsed.clarity_score_band === 'string' ? parsed.clarity_score_band.trim().toLowerCase() : '';\n  if (!ALLOWED_BANDS.includes(clarityScoreBand)) {\n    errors.push('clarity_score_band must be high, medium, or low (got \"' + String(parsed.clarity_score_band ?? '') + '\")');\n  }\n\n  const draftEmailSubject = typeof parsed.draft_email_subject === 'string' ? parsed.draft_email_subject.trim() : '';\n  if (draftEmailSubject.length < 3 || draftEmailSubject.length > 200) {\n    errors.push('draft_email_subject must be a string between 3 and 200 characters');\n  }\n\n  const draftEmailBody = typeof parsed.draft_email_body === 'string' ? parsed.draft_email_body.trim() : '';\n  if (draftEmailBody.length < 20 || draftEmailBody.length > 5000) {\n    errors.push('draft_email_body must be a string between 20 and 5000 characters');\n  }\n\n  if (errors.length > 0) {\n    return {\n      valid: false,\n      model_name: MODEL_NAME,\n      prompt_version: PROMPT_VERSION,\n      error_code: 'AI_SCHEMA_VALIDATION_ERROR',\n      error_message: errors.join('; '),\n      errors,\n      raw_preview: rawPreview,\n    };\n  }\n\n  return {\n    valid: true,\n    model_name: MODEL_NAME,\n    prompt_version: PROMPT_VERSION,\n    analysis: {\n      detected_service: detectedService,\n      project_summary: projectSummary,\n      missing_information: missingInformation,\n      scope_fit: scopeFit,\n      spam_suspected: parsed.spam_suspected,\n      clarity_score_band: clarityScoreBand,\n      draft_email_subject: draftEmailSubject,\n      draft_email_body: draftEmailBody,\n      draft_email_snapshot: 'Subject: ' + draftEmailSubject + '\\n\\n' + draftEmailBody,\n    },\n  };\n}\n\nconst items = $input.all();\nreturn items.map((item) => {\n  const raw = item.json?.text ?? item.json?.output ?? item.json;\n  return { json: validateAiQualificationOutput(raw) };\n});",
+        "language": "javaScript",
+        "mode": "runOnceForAllItems"
+      },
+      "notes": "Deterministic schema gate synced with n8n/code-nodes/validate-ai-output.js (blocks malformed JSON or forbidden LLM score fields before any DB write)."
+    },
+    {
+      "id": "beac39b3-a019-4ada-a3e6-4444e8859dd2",
+      "name": "If AI Output Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        4240,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "ai-output-valid-check",
+              "leftValue": "={{ $('Validate AI Output Schema').item.json.valid }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "141c6565-869c-4641-8f7e-f39a50da7cd7",
+      "name": "Save AI Analysis Snapshot",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4500,
+        -200
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "model_name",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.model_name }}"
+            },
+            {
+              "fieldId": "prompt_version",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.prompt_version }}"
+            },
+            {
+              "fieldId": "detected_service",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.analysis.detected_service }}"
+            },
+            {
+              "fieldId": "project_summary",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.analysis.project_summary }}"
+            },
+            {
+              "fieldId": "missing_information",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.analysis.missing_information }}"
+            },
+            {
+              "fieldId": "scope_fit",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.analysis.scope_fit }}"
+            },
+            {
+              "fieldId": "spam_suspected",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.analysis.spam_suspected }}"
+            },
+            {
+              "fieldId": "draft_email",
+              "fieldValue": "={{ $('Validate AI Output Schema').item.json.analysis.draft_email_snapshot }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "lead_analyses"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Persists validated AI extraction and raw draft snapshot to lead_analyses (score fields populated by Day 6 deterministic scoring).",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "d4a493ee-9d7a-488a-ad34-b966c7c1a668",
+      "name": "Log AI Qualification Completed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4760,
+        -200
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "ai_qualification_completed"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { lead_analysis_id: $('Save AI Analysis Snapshot').item.json.id, model_name: $('Validate AI Output Schema').item.json.model_name, prompt_version: $('Validate AI Output Schema').item.json.prompt_version, detected_service: $('Validate AI Output Schema').item.json.analysis.detected_service, scope_fit: $('Validate AI Output Schema').item.json.analysis.scope_fit, spam_suspected: $('Validate AI Output Schema').item.json.analysis.spam_suspected, clarity_score_band: $('Validate AI Output Schema').item.json.analysis.clarity_score_band } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "afdf3555-2d0e-4b08-8f60-69f62224c6b6",
+      "name": "Prepare AI Error Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4500,
+        160
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ai-err-node",
+              "name": "node_name",
+              "type": "string",
+              "value": "={{ $json.error_code ? 'Validate AI Output Schema' : ($json.error?.node?.name ?? 'Analyze Lead with DeepSeek') }}"
+            },
+            {
+              "id": "ai-err-msg",
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ String($json.error_message ?? $json.error?.message ?? $json.message ?? 'AI qualification failed').slice(0, 1000) }}"
+            },
+            {
+              "id": "ai-err-code",
+              "name": "error_code",
+              "type": "string",
+              "value": "={{ String($json.error_code ?? 'AI_PROVIDER_ERROR') }}"
+            }
+          ]
+        },
+        "mode": "manual",
+        "options": {}
+      },
+      "notes": "Normalizes AI timeout, API failure, or schema validation failure into a unified workflow_errors payload."
+    },
+    {
+      "id": "b0474fb8-56f8-4175-8063-5fab5f30e0dc",
+      "name": "Record AI Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4760,
+        160
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.submission_id }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "WF01 - Lead Intake & Qualification"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ $('Prepare AI Error Record').item.json.node_name }}"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ $('Prepare AI Error Record').item.json.error_message }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "workflow_errors"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Writes AI failure or malformed JSON error into workflow_errors without inserting fabricated lead_analyses rows.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "ea1bcfa5-d509-4d98-ad9c-4aaa70f4397c",
+      "name": "Log AI Qualification Failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5020,
+        160
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "ai_qualification_failed"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { workflow_error_id: $('Record AI Error').item.json.id, node_name: $('Prepare AI Error Record').item.json.node_name, error_code: $('Prepare AI Error Record').item.json.error_code, error_message: $('Prepare AI Error Record').item.json.error_message } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
     }
   ],
   "connections": {
@@ -786,6 +1178,133 @@
         [
           {
             "node": "Return Database Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acknowledge Lead Accepted": {
+      "main": [
+        [
+          {
+            "node": "Mark Inquiry Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Inquiry Processing": {
+      "main": [
+        [
+          {
+            "node": "Analyze Lead with DeepSeek",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Error Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze Lead with DeepSeek",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Lead with DeepSeek": {
+      "main": [
+        [
+          {
+            "node": "Validate AI Output Schema",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Error Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate AI Output Schema": {
+      "main": [
+        [
+          {
+            "node": "If AI Output Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If AI Output Valid": {
+      "main": [
+        [
+          {
+            "node": "Save AI Analysis Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Error Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save AI Analysis Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Log AI Qualification Completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Error Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Error Record": {
+      "main": [
+        [
+          {
+            "node": "Record AI Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record AI Error": {
+      "main": [
+        [
+          {
+            "node": "Log AI Qualification Failed",
             "type": "main",
             "index": 0
           }
