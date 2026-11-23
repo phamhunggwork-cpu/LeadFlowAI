@@ -159,18 +159,18 @@
         "returnAll": false,
         "tableId": "inquiries"
       },
-      "credentials": {
-        "supabaseApi": {
-          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
-          "name": "Supabase LeadFlow"
-        }
-      },
       "notes": "Idempotency check on inquiries.submission_id before any writes or AI calls.",
       "onError": "continueErrorOutput",
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
-      "alwaysOutputData": true
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
     },
     {
       "id": "25062eb1-5e1c-4a28-884b-acfc113833b4",
@@ -250,18 +250,18 @@
         "returnAll": false,
         "tableId": "contacts"
       },
-      "credentials": {
-        "supabaseApi": {
-          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
-          "name": "Supabase LeadFlow"
-        }
-      },
       "notes": "Looks up existing contact by normalized lowercase email (matches contacts_email_unique).",
       "onError": "continueErrorOutput",
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
-      "alwaysOutputData": true
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
     },
     {
       "id": "aa33d4f0-6c05-481e-a966-700c12214686",
@@ -339,17 +339,17 @@
         "resource": "row",
         "tableId": "contacts"
       },
+      "notes": "Updates existing contact while preserving non-null company_name and phone when omitted.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "notes": "Updates existing contact while preserving non-null company_name and phone when omitted.",
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000
+      }
     },
     {
       "id": "6b4503b1-f784-4f17-860e-27f495d82893",
@@ -386,16 +386,16 @@
         "resource": "row",
         "tableId": "contacts"
       },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "8dcc768b-264b-468a-bd5e-9f61aabbe7af",
@@ -513,16 +513,16 @@
         "resource": "row",
         "tableId": "inquiries"
       },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "47c5b401-bca3-41b5-ae4b-9cb6ccdabf44",
@@ -555,16 +555,16 @@
         "resource": "row",
         "tableId": "activity_logs"
       },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "f338918b-3f80-4cef-bcff-f0ace2759700",
@@ -618,17 +618,17 @@
         "resource": "row",
         "tableId": "inquiries"
       },
+      "notes": "Transitions inquiry from new -> processing before calling DeepSeek (02-dataflow-and-states.md).",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "notes": "Transitions inquiry from new -> processing before calling DeepSeek (02-dataflow-and-states.md).",
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "ba4f75c7-f641-43fc-a803-0dc6948a4a0d",
@@ -648,13 +648,13 @@
           "timeout": 30000
         }
       },
+      "notes": "DeepSeek deepseek-chat in JSON mode (ADR-007); bounded timeout and retries.",
       "credentials": {
         "deepSeekApi": {
           "id": "REPLACE_WITH_DEEPSEEK_CREDENTIAL_ID",
           "name": "DeepSeek LeadFlow"
         }
-      },
-      "notes": "DeepSeek deepseek-chat in JSON mode (ADR-007); bounded timeout and retries."
+      }
     },
     {
       "id": "6694bd4a-4b05-4977-9b6e-652a93e66bc0",
@@ -803,17 +803,17 @@
         "resource": "row",
         "tableId": "lead_analyses"
       },
+      "notes": "Persists validated AI extraction and raw draft snapshot to lead_analyses (score fields populated by Day 6 deterministic scoring).",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "notes": "Persists validated AI extraction and raw draft snapshot to lead_analyses (score fields populated by Day 6 deterministic scoring).",
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "afdf3555-2d0e-4b08-8f60-69f62224c6b6",
@@ -899,16 +899,16 @@
         "resource": "row",
         "tableId": "workflow_errors"
       },
+      "notes": "Writes AI failure or malformed JSON error into workflow_errors without inserting fabricated lead_analyses rows.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "notes": "Writes AI failure or malformed JSON error into workflow_errors without inserting fabricated lead_analyses rows.",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "ea1bcfa5-d509-4d98-ad9c-4aaa70f4397c",
@@ -941,15 +941,15 @@
         "resource": "row",
         "tableId": "activity_logs"
       },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "ad5877ab-91a5-489c-95cc-5d4799e622e8",
@@ -1013,17 +1013,17 @@
         "resource": "row",
         "tableId": "inquiries"
       },
+      "notes": "Updates inquiries lead_status, priority, approval_status, and followup_status from deterministic scoring output.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "notes": "Updates inquiries lead_status, priority, approval_status, and followup_status from deterministic scoring output.",
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "cee5056a-c5bd-4d68-91c8-e953fd1165c2",
@@ -1170,17 +1170,17 @@
         "resource": "row",
         "tableId": "email_messages"
       },
+      "notes": "ADR-002: creates operational initial draft in email_messages (status=pending_approval, idempotency_key=email:<inquiry_id>:initial) ONLY for qualified and needs_review leads.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "notes": "ADR-002: creates operational initial draft in email_messages (status=pending_approval, idempotency_key=email:<inquiry_id>:initial) ONLY for qualified and needs_review leads.",
-      "onError": "continueErrorOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "c2e4d9f3-6b55-424e-bd45-36437260d9f9",
@@ -1213,15 +1213,15 @@
         "resource": "row",
         "tableId": "activity_logs"
       },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "4d3defef-c126-4581-8a5b-9a830287015d",
@@ -1254,15 +1254,15 @@
         "resource": "row",
         "tableId": "activity_logs"
       },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
-      },
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 1000
+      }
     },
     {
       "id": "6a069b75-c41a-49cf-9dcb-231ffad6c7a9",
@@ -1311,16 +1311,344 @@
         "resource": "row",
         "tableId": "workflow_errors"
       },
+      "notes": "Logs unexpected scoring/routing persistence failures to workflow_errors without dropping items silently.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
       "credentials": {
         "supabaseApi": {
           "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
           "name": "Supabase LeadFlow"
         }
+      }
+    },
+    {
+      "id": "53f03d7a-4693-4134-b681-5c739d73055d",
+      "name": "Ready for CRM Sync",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        6080,
+        -100
+      ],
+      "parameters": {},
+      "notes": "Single convergence exit for Stage 3 (qualified, needs_review, and not_qualified) into Stage 4 HubSpot CRM sync."
+    },
+    {
+      "id": "139b8c1c-4cf7-40dd-8ab5-801266be2a56",
+      "name": "If Sync Eligible (Not Spam)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        6360,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "hubspot-not-spam-check",
+              "leftValue": "={{ $('Validate AI Output Schema').item.json.analysis.spam_suspected }}",
+              "operator": {
+                "operation": "false",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          }
+        },
+        "options": {}
       },
-      "notes": "Logs unexpected scoring/routing persistence failures to workflow_errors without dropping items silently.",
+      "notes": "Routes genuine leads (spam_suspected === false) to HubSpot CRM upsert; skips suspected spam to keep CRM clean."
+    },
+    {
+      "id": "e8f0bb95-97a1-4780-a867-69503c4d8d33",
+      "name": "Upsert HubSpot Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.3,
+      "position": [
+        6640,
+        -220
+      ],
+      "parameters": {
+        "additionalFields": {
+          "companyName": "={{ $('Normalize Lead Data').item.json.company_name ?? $('Lookup Contact by Email').item.json.company_name ?? '' }}",
+          "firstName": "={{ (() => {\n  // Split normalized full_name into firstName (first token)\n  const parts = ($('Normalize Lead Data').item.json.full_name || '').trim().split(/\\s+/);\n  return parts[0] || '';\n})() }}",
+          "lastName": "={{ (() => {\n  // Remaining tokens after firstName become lastName\n  const parts = ($('Normalize Lead Data').item.json.full_name || '').trim().split(/\\s+/);\n  return parts.length > 1 ? parts.slice(1).join(' ') : '';\n})() }}",
+          "leadStatus": "={{ (() => {\n  // Map deterministic qualification_status to HubSpot hs_lead_status enum\n  const status = $('Score Lead Deterministically').item.json.qualification_status;\n  if (status === 'qualified') return 'OPEN';\n  if (status === 'needs_review') return 'IN_PROGRESS';\n  return 'UNQUALIFIED';\n})() }}",
+          "lifeCycleStage": "={{ (() => {\n  // Map deterministic qualification_status to HubSpot lifecyclestage enum\n  const status = $('Score Lead Deterministically').item.json.qualification_status;\n  if (status === 'qualified') return 'salesqualifiedlead';\n  if (status === 'needs_review') return 'lead';\n  return 'other';\n})() }}",
+          "message": "={{ (() => {\n  // Structured LeadFlow AI snapshot stored in standard HubSpot message property\n  const lead = $('Normalize Lead Data').item.json;\n  const ai = $('Validate AI Output Schema').item.json.analysis;\n  const score = $('Score Lead Deterministically').item.json;\n  const inquiryId = $('Insert Inquiry').item.json.id;\n  const budgetStr =\n    lead.budget_min !== null && lead.budget_max !== null\n      ? `${lead.budget_currency} ${lead.budget_min}-${lead.budget_max}`\n      : lead.budget_max !== null\n        ? `${lead.budget_currency} up to ${lead.budget_max}`\n        : lead.budget_min !== null\n          ? `${lead.budget_currency} ${lead.budget_min}+`\n          : 'Undisclosed';\n  const timelineStr = lead.timeline_weeks ? `${lead.timeline_weeks} weeks` : 'Unspecified';\n  return [\n    `[LeadFlow AI | ${String(score.qualification_status || '').toUpperCase()} | Score: ${score.qualification_score}/100 | Priority: ${score.priority}]`,\n    `Service: ${ai.detected_service}`,\n    `Budget: ${budgetStr} | Timeline: ${timelineStr}`,\n    `Summary: ${ai.project_summary}`,\n    `Inquiry ID: ${inquiryId} | Submission ID: ${lead.submission_id}`\n  ].join('\\n');\n})() }}",
+          "phoneNumber": "={{ $('Normalize Lead Data').item.json.phone ?? $('Lookup Contact by Email').item.json.phone ?? '' }}"
+        },
+        "authentication": "appToken",
+        "email": "={{ $('Normalize Lead Data').item.json.email }}",
+        "operation": "upsert",
+        "options": {
+          "resolveData": false
+        },
+        "resource": "contact"
+      },
+      "notes": "Upserts HubSpot contact by normalized lowercase email (idempotent across repeat inquiries) with mapped standard properties and LeadFlow AI summary.",
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "REPLACE_WITH_HUBSPOT_CREDENTIAL_ID",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "id": "ed5073cf-77e6-4dfb-b75e-1a71f281e26e",
+      "name": "Save HubSpot Contact ID",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6920,
+        -220
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "hubspot_contact_id",
+              "fieldValue": "={{ (() => {\n  // Store HubSpot contact ID as trimmed string (or null if absent to preserve UNIQUE constraint)\n  const rawId = $('Upsert HubSpot Contact').item.json.vid ?? $('Upsert HubSpot Contact').item.json.id;\n  return rawId !== undefined && rawId !== null && String(rawId).trim() !== '' ? String(rawId).trim() : null;\n})() }}"
+            }
+          ]
+        },
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "condition": "eq",
+              "keyName": "id",
+              "keyValue": "={{ $('Resolve Contact ID').item.json.contact_id }}"
+            }
+          ]
+        },
+        "matchType": "allFilters",
+        "operation": "update",
+        "resource": "row",
+        "tableId": "contacts"
+      },
+      "notes": "Persists returned HubSpot contact ID (vid) into public.contacts.hubspot_contact_id.",
+      "onError": "continueErrorOutput",
       "retryOnFail": true,
       "maxTries": 2,
-      "waitBetweenTries": 1000
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "980756b1-186f-4dc6-b03b-c56d776a6033",
+      "name": "Log HubSpot Contact Synced",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        7200,
+        -220
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "hubspot_contact_synced"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ (() => {\n  const status = $('Score Lead Deterministically').item.json.qualification_status;\n  const rawId = $('Upsert HubSpot Contact').item.json.vid ?? $('Upsert HubSpot Contact').item.json.id;\n  return {\n    contact_id: $('Resolve Contact ID').item.json.contact_id,\n    hubspot_contact_id: rawId !== undefined && rawId !== null ? String(rawId) : null,\n    is_new: Boolean($('Upsert HubSpot Contact').item.json.isNew),\n    hubspot_lead_status: status === 'qualified' ? 'OPEN' : status === 'needs_review' ? 'IN_PROGRESS' : 'UNQUALIFIED',\n    hubspot_lifecycle_stage: status === 'qualified' ? 'salesqualifiedlead' : status === 'needs_review' ? 'lead' : 'other'\n  };\n})() }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "notes": "Records successful HubSpot CRM upsert in activity_logs with hubspot_contact_id and mapped stages.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "5d9c2de2-7fc1-45f2-a506-fa2e6a6da839",
+      "name": "Log HubSpot Sync Skipped",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6920,
+        40
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "hubspot_sync_skipped"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { contact_id: $('Resolve Contact ID').item.json.contact_id, reason: 'spam_suspected', qualification_status: $('Score Lead Deterministically').item.json.qualification_status } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "notes": "Audit trail when HubSpot CRM sync is intentionally skipped for suspected spam leads.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "20a21dd7-24ce-49ad-aeb0-627dbd472412",
+      "name": "Record HubSpot Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6920,
+        260
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Normalize Lead Data').item.json.submission_id }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "WF01 - Lead Intake & Qualification"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ typeof $json.error === 'object' && $json.error?.node?.name ? String($json.error.node.name) : ($json.vid || $json['canonical-vid'] ? 'Save HubSpot Contact ID' : 'Upsert HubSpot Contact') }}"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ (() => {\n  // Support both string errors (HubSpot continueErrorOutput) and Error objects\n  const err = $json.error;\n  const msg = typeof err === 'string'\n    ? err\n    : (err?.message ?? $json.message ?? 'HubSpot contact sync failed');\n  return String(msg).slice(0, 1000);\n})() }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "workflow_errors"
+      },
+      "notes": "Captures HubSpot API or hubspot_contact_id DB persistence errors in workflow_errors without losing scored lead or email draft.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "426ecdca-11fe-4891-b922-b9f99d9000aa",
+      "name": "Log HubSpot Sync Failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        7200,
+        260
+      ],
+      "parameters": {
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Insert Inquiry').item.json.id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "hubspot_sync_failed"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { workflow_error_id: $('Record HubSpot Error').item.json.id, node_name: $('Record HubSpot Error').item.json.node_name, error_message: $('Record HubSpot Error').item.json.error_message } }}"
+            }
+          ]
+        },
+        "operation": "create",
+        "resource": "row",
+        "tableId": "activity_logs"
+      },
+      "notes": "Writes activity_logs audit record referencing the workflow_errors row when HubSpot sync fails.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "0d43234e-a924-4397-93f7-4446048d25c5",
+      "name": "CRM Sync Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        7480,
+        -100
+      ],
+      "parameters": {},
+      "notes": "Single convergence exit for Stage 4 HubSpot CRM sync (ready for Day 8 Slack Notification stage)."
     }
   ],
   "connections": {
@@ -1730,6 +2058,137 @@
         [
           {
             "node": "Record Scoring Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead Routed": {
+      "main": [
+        [
+          {
+            "node": "Ready for CRM Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Lead Not Qualified": {
+      "main": [
+        [
+          {
+            "node": "Ready for CRM Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready for CRM Sync": {
+      "main": [
+        [
+          {
+            "node": "If Sync Eligible (Not Spam)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Sync Eligible (Not Spam)": {
+      "main": [
+        [
+          {
+            "node": "Upsert HubSpot Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log HubSpot Sync Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert HubSpot Contact": {
+      "main": [
+        [
+          {
+            "node": "Save HubSpot Contact ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record HubSpot Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save HubSpot Contact ID": {
+      "main": [
+        [
+          {
+            "node": "Log HubSpot Contact Synced",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record HubSpot Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log HubSpot Contact Synced": {
+      "main": [
+        [
+          {
+            "node": "CRM Sync Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log HubSpot Sync Skipped": {
+      "main": [
+        [
+          {
+            "node": "CRM Sync Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record HubSpot Error": {
+      "main": [
+        [
+          {
+            "node": "Log HubSpot Sync Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log HubSpot Sync Failed": {
+      "main": [
+        [
+          {
+            "node": "CRM Sync Complete",
             "type": "main",
             "index": 0
           }
