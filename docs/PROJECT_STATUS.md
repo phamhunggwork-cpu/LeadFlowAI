@@ -4,19 +4,19 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 4 (Validation & Duplicate Prevention)
-- **Active Git Branch:** `feat/day4-validation-dedup`
-- **Overall Progress:** `12 / 51` roadmap tasks completed (`23.5%`)
+- **Current Roadmap Day:** Day 5 (AI Qualification)
+- **Active Git Branch:** `main` *(Day 4 merged; next: `feat/day5-ai-qualification`)*
+- **Overall Progress:** `14 / 51` roadmap tasks completed (`27.5%`)
 - **Last Updated:** 2026-11-23
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 4 Task 2 (`2 / 4`) — built pure deterministic normalizer [`n8n/code-nodes/normalize-lead.js`](../n8n/code-nodes/normalize-lead.js), deployed `Normalize Lead Data` JS Code node (`runOnceForAllItems`, synced with `normalize-lead.js`) into live `WF01` (`Mynf0z0HIudjtNXF`, active version `dcfb3da7-f7e8-4c2a-9c68-e9f92480e5ea`), updated `Acknowledge Lead Accepted` to return normalized `submission_id`/`received_at`, and exported sanitized JSON to [`n8n/workflows/wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json). Verified 5/5 unit tests, `leadflow-n8n-sanitize`, and live WF01 executions `#32`/`#33`/`#34` (`TC09` normalized, auto-generated `submission_id`, `TC11` blocked at 400).
-2. **Current State / Branch:** Active branch `feat/day4-validation-dedup` has Day 4 Task 1 committed (`eef9b5e`, `9677186`, `f58b470`); Day 4 Task 2 changes (`n8n/code-nodes/normalize-lead.js`, `n8n/workflows/wf01-lead-intake-qualification.json`, `docs/PROJECT_STATUS.md`) are verified and ready to commit.
-3. **Blockers / Pending Actions:** No blockers for Day 4. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) confirm LLM provider (`OpenAI gpt-4o-mini` in ADRs vs `DEEPSEEK_API_KEY` in `backend/.env`) before Day 5; (c) note `TEST_SUPABASE_URL` currently points to `leadflow-ai` (separate test project or strict `TEST_RUN_PREFIX` cleanup needed before Day 13).
-4. **Next Immediate Action:** Commit Day 4 Task 2, then implement **Day 4 Tasks 3 & 4** (`2 / 4` remaining) on `feat/day4-validation-dedup`: `submission_id` deduplication/idempotency check and Supabase `contacts` upsert (by normalized email) + `inquiries` insert.
+1. **Last Completed:** Day 4 — Validation & Duplicate Prevention (`4 / 4` COMPLETED & merged into `main`): hardened Express Zod validation + HTTP `409 CONFLICT` passthrough (`backend/`), built pure deterministic normalizer [`n8n/code-nodes/normalize-lead.js`](../n8n/code-nodes/normalize-lead.js), deployed & published full 17-node `WF01` (`Mynf0z0HIudjtNXF`, active version `fc852be5-73db-400e-848b-9a0b30015f78`) with Set IIFE validation, JS normalization, `submission_id` deduplication (`409 CONFLICT`), normalized-email `contacts` lookup/upsert, `inquiries` + `activity_logs` persistence on Supabase (`Supabase LeadFlow`), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 4/4 E2E cases (API + Supabase DB) and cleaned test rows back to baseline (`1` contact, `2` inquiries, `0` activity_logs).
+2. **Current State / Branch:** `main` is clean with Days 1–4 merged (`feat/day4-validation-dedup` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
+3. **Blockers / Pending Actions:** Before starting Day 5, confirm LLM provider (`OpenAI gpt-4o-mini` in ADR-001 vs `DEEPSEEK_API_KEY` in `backend/.env`) and create the corresponding LLM credential in n8n UI. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Confirm LLM provider & n8n credential, create branch `feat/day5-ai-qualification` from `main`, and implement **Day 5 — AI Qualification** (`0 / 4`: `n8n/prompts/` system prompt, Structured Outputs strict JSON, safe malformed/timeout handling).
 5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/code-nodes/normalize-lead.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`12 / 51`)
+## 14-Day Master Roadmap Checklist (`14 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -47,11 +47,11 @@
 - [x] Create Node.js Express API Gateway calling authenticated n8n webhook (`backend/`)
 - [x] Create WF01 Webhook Trigger in n8n (`n8n/workflows/wf01-lead-intake-qualification.json`)
 
-### Day 4 — Validation & Duplicate Prevention (`2 / 4`)
+### Day 4 — Validation & Duplicate Prevention (`4 / 4`)
 - [x] Validate required fields and email format (Zod + WF01)
 - [x] Normalize data via JS Code node (`n8n/code-nodes/`)
-- [ ] Generate/enforce unique `submission_id` and idempotency check
-- [ ] Save `contacts` (normalized email upsert) and `inquiries` into Supabase
+- [x] Generate/enforce unique `submission_id` and idempotency check
+- [x] Save `contacts` (normalized email upsert) and `inquiries` into Supabase
 
 ### Day 5 — AI Qualification (`0 / 4`)
 - [ ] Write system prompt and extraction criteria (`n8n/prompts/`)
