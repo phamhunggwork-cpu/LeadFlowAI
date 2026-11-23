@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 5 (AI Qualification)
-- **Active Git Branch:** `main` *(Day 4 merged; next: `feat/day5-ai-qualification`)*
-- **Overall Progress:** `14 / 51` roadmap tasks completed (`27.5%`)
+- **Current Roadmap Day:** Day 6 (Lead Scoring & Routing)
+- **Active Git Branch:** `main` *(Day 5 merged; next: `feat/day6-lead-scoring`)*
+- **Overall Progress:** `18 / 51` roadmap tasks completed (`35.3%`)
 - **Last Updated:** 2026-11-23
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 4 — Validation & Duplicate Prevention (`4 / 4` COMPLETED & merged into `main`): hardened Express Zod validation + HTTP `409 CONFLICT` passthrough (`backend/`), built pure deterministic normalizer [`n8n/code-nodes/normalize-lead.js`](../n8n/code-nodes/normalize-lead.js), deployed & published full 17-node `WF01` (`Mynf0z0HIudjtNXF`, active version `fc852be5-73db-400e-848b-9a0b30015f78`) with Set IIFE validation, JS normalization, `submission_id` deduplication (`409 CONFLICT`), normalized-email `contacts` lookup/upsert, `inquiries` + `activity_logs` persistence on Supabase (`Supabase LeadFlow`), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 4/4 E2E cases (API + Supabase DB) and cleaned test rows back to baseline (`1` contact, `2` inquiries, `0` activity_logs).
-2. **Current State / Branch:** `main` is clean with Days 1–4 merged (`feat/day4-validation-dedup` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
-3. **Blockers / Pending Actions:** LLM provider switched to **DeepSeek (`deepseek-chat`)** per ADR-007; create `DeepSeek LeadFlow` (`DeepSeek API` / `deepSeekApi`) credential in n8n UI before running Day 5 live tests. Deferred non-blocking items: (a) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (b) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Create `DeepSeek LeadFlow` credential in n8n UI, create branch `feat/day5-ai-qualification` from `main`, and implement **Day 5 — AI Qualification** (`0 / 4`: `n8n/prompts/` system prompt, DeepSeek `deepseek-chat` JSON mode + strict JS schema gate, safe malformed/timeout handling).
-5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/code-nodes/normalize-lead.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
+1. **Last Completed:** Day 5 — AI Qualification (`4 / 4` COMPLETED & merged into `main`): created versioned prompt [`n8n/prompts/wf01-lead-qualification-v1.md`](../n8n/prompts/wf01-lead-qualification-v1.md) (`v1.0.0`), built & unit-tested strict 8-key schema gate [`n8n/code-nodes/validate-ai-output.js`](../n8n/code-nodes/validate-ai-output.js) (6/6 PASS, blocks malformed JSON and forbidden LLM score keys), deployed & published async `AI Qualification (Async)` stage (10 nodes, total 27 nodes in 3 stage groups) on `WF01` (`Mynf0z0HIudjtNXF`, active version `86326ee1-0f45-41d6-842e-328527e20494`) using `DeepSeek LeadFlow` (`deepseek-chat`, `json_object`, `temperature=0.2`), and exported sanitized JSON ([`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json)). Dual-verified 5 live DeepSeek E2E cases + developer manual E2E verification.
+2. **Current State / Branch:** `main` is clean with Days 1–5 merged (`feat/day5-ai-qualification` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready).
+3. **Blockers / Pending Actions:** No blockers for Day 6. Deferred non-blocking items: (a) create HubSpot Private App credential in n8n UI before Day 7; (b) create Slack credential before Day 8; (c) create test/reviewer user in Supabase `auth.users` before Day 9 / Vitest; (d) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Create branch `feat/day6-lead-scoring` from `main` and implement **Day 6 — Lead Scoring & Routing** (`0 / 3`: `n8n/code-nodes/score-lead.js` 0–100 + deal-breaker overrides, `Qualified`/`Needs Review`/`Not Qualified` branches, save `score_breakdown` + `inquiries` status/priority/approval + operational `email_messages` draft).
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `n8n/prompts/wf01-lead-qualification-v1.md`, `n8n/code-nodes/validate-ai-output.js`, `n8n/workflows/wf01-lead-intake-qualification.json`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`14 / 51`)
+## 14-Day Master Roadmap Checklist (`18 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -53,11 +53,11 @@
 - [x] Generate/enforce unique `submission_id` and idempotency check
 - [x] Save `contacts` (normalized email upsert) and `inquiries` into Supabase
 
-### Day 5 — AI Qualification (`0 / 4`)
-- [ ] Write system prompt and extraction criteria (`n8n/prompts/`)
-- [ ] Connect DeepSeek `deepseek-chat` API (ADR-007)
-- [ ] Enforce strict JSON schema output (no score generation by LLM)
-- [ ] Validate and safely handle malformed/timeout AI responses
+### Day 5 — AI Qualification (`4 / 4`)
+- [x] Write system prompt and extraction criteria (`n8n/prompts/`)
+- [x] Connect DeepSeek `deepseek-chat` API (ADR-007)
+- [x] Enforce strict JSON schema output (no score generation by LLM)
+- [x] Validate and safely handle malformed/timeout AI responses
 
 ### Day 6 — Lead Scoring & Routing (`0 / 3`)
 - [ ] Write deterministic JS scoring rules (0–100 + deal-breakers) in `n8n/code-nodes/`
