@@ -11,6 +11,7 @@
 | ADR-005 | 2026-11-22 | Accepted | n8n Workflow Deployment via Public REST API First (MCP Optional Later) |
 | ADR-006 | 2026-11-22 | Accepted | Hybrid Testing Strategy (Vitest Integration + `test-form.html`) |
 | ADR-007 | 2026-11-23 | Accepted | Switch Primary LLM Provider to DeepSeek (`deepseek-chat`) |
+| ADR-008 | 2026-11-24 | Accepted | WF03 Deterministic Follow-up Template & Reconciliation |
 
 ---
 
@@ -63,3 +64,13 @@
   - Maintain the non-negotiable AI vs. Deterministic Split: DeepSeek performs semantic extraction, spam suspicion, and email drafting ONLY — never computing `qualification_score`, `qualification_status`, or `priority`.
   - Prompt and output schema remain provider-agnostic so OpenAI `gpt-4o-mini` or Gemini can still be swapped in without changing downstream scoring or DB persistence.
 - **Consequences:** Lower development/test API cost using the developer's existing DeepSeek key; strict schema gate guarantees identical safety against malformed AI JSON; portfolio narrative in `docs/portfolio/*` will be synced on Day 14.
+
+## ADR-008: WF03 Deterministic Follow-up Template & Reconciliation
+- **Context:** Day 11 needs a single automated follow-up 24h+ after the delivered initial email. Business rules forbid customer emails without human approval and forbid the LLM from sending emails.
+- **Decision:**
+  - The follow-up uses a **fixed deterministic template** (subject/body built in `n8n/code-nodes/evaluate-followup.js`); no LLM call. The human-approved initial email authorizes the sequence, and the template adds an opt-out line.
+  - WF03 loads `followup_status='scheduled'` inquiries and evaluates stop rules in code: `unsubscribed_at` set, `lead_status` in `replied|closed|won`, or `consent_to_email != true` moves the lead to `followup_status='stopped'` and logs `follow_up_stopped` with the reason. Only `lead_status='contacted'` leads with a `sent` initial email older than 24h are sent.
+  - Inserting the `follow_up` row (`idempotency_key = email:<inquiry_id>:follow_up_1`, UNIQUE) before calling Resend is the duplicate lock; the same key is sent as the Resend `Idempotency-Key`. Existing follow-up rows are never re-sent automatically (failed rows stay `failed` with a `workflow_errors` entry for Day 12 retry handling).
+  - If a `sent` follow-up row already exists while the inquiry is still `scheduled` (partial failure), WF03 reconciles `followup_status='sent'` and logs `follow_up_reconciled_sent` instead of re-sending.
+  - Per-run cap of 25 sends. `PostgREST in.(...)` filters are built only from regex-validated DB UUIDs.
+- **Consequences:** No new enum values or schema changes. Deterministic, replay-safe follow-ups; failed sends need manual or Day 12 retry.
