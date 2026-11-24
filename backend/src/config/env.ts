@@ -13,6 +13,27 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   CORS_ORIGIN: z.string().trim().min(1).default('http://localhost:5173'),
+  SUPABASE_URL: z
+    .string()
+    .trim()
+    .url('SUPABASE_URL must be a valid URL')
+    .transform((val) => val.replace(/\/+$/, '')),
+  SUPABASE_ANON_KEY: z
+    .string()
+    .trim()
+    .min(20, 'SUPABASE_ANON_KEY must be set')
+    .refine(
+      (val) => !val.startsWith('replace_with_'),
+      'SUPABASE_ANON_KEY must not be a placeholder value',
+    ),
+  SUPABASE_SERVICE_ROLE_KEY: z
+    .string()
+    .trim()
+    .min(20, 'SUPABASE_SERVICE_ROLE_KEY must be set')
+    .refine(
+      (val) => !val.startsWith('replace_with_'),
+      'SUPABASE_SERVICE_ROLE_KEY must not be a placeholder value',
+    ),
   N8N_WEBHOOK_BASE_URL: z
     .string()
     .trim()

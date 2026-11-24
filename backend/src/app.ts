@@ -3,7 +3,9 @@ import express from 'express';
 import helmet from 'helmet';
 import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { inquiryRouter } from './routes/inquiry.routes.js';
 import { leadRouter } from './routes/lead.routes.js';
+import { workflowErrorRouter } from './routes/workflowError.routes.js';
 import { sendSuccess } from './utils/apiResponse.js';
 
 export function createApp() {
@@ -37,6 +39,8 @@ export function createApp() {
   });
 
   app.use('/api/leads', leadRouter);
+  app.use('/api/inquiries', inquiryRouter);
+  app.use('/api/workflow-errors', workflowErrorRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
