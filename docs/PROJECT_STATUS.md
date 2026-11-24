@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 12 (Error Handling — WF04)
-- **Active Git Branch:** `main` *(Day 11 `feat/day11-followup-wf03` merged)*
-- **Overall Progress:** `39 / 51` roadmap tasks completed (`76.5%`)
+- **Current Roadmap Day:** Day 13 (Hybrid End-to-End Testing)
+- **Active Git Branch:** `main` *(Day 12 `feat/day12-error-handling-wf04` merged)*
+- **Overall Progress:** `43 / 51` roadmap tasks completed (`84.3%`)
 - **Last Updated:** 2026-11-24
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Completed **Day 11 — Follow-up Automation (`WF03 - Automated Follow-up`, id `O6dCV2xYR49EpYhN`, 18 nodes, 4 node groups, tags `wf03`/`followup`/`leadflow-ai`)** in `n8n/workflows/wf03-automated-followup.json` + unit-tested `n8n/code-nodes/evaluate-followup.js` (ADR-008): hourly Schedule Trigger, deterministic 24h+ eligibility and stop rules (unsubscribed, replied, closed, won, no consent → `followup_status=stopped`), fixed-template follow-up via Resend with `Idempotency-Key email:<inquiry_id>:follow_up_1`, queued-row duplicate lock, failure isolation (`failed` + `workflow_errors`), and reconcile of partially-sent leads. Live verified (executions 74–77), Day 11 test data cleaned from Supabase (`0` residual `d11test-%` rows; inquiry `718dbac6-...` restored), `leadflow-n8n-sanitize` passed, and WF03 published `[ACTIVE]`.
-2. **Current State / Branch:** Clean `main` after merging `feat/day11-followup-wf03`. `WF01`, `WF02`, and `WF03` are all `[ACTIVE]` on local n8n with credentials bound.
-3. **Blockers / Pending Actions:** None for Day 11. Deferred: provision separate test Supabase project (`TEST_SUPABASE_URL`) before Day 13 automated Vitest suite.
-4. **Next Immediate Action:** Branch `feat/day12-error-handling-wf04` from `main` and implement **Day 12 — WF04 Error Handling** (Error Trigger, `workflow_errors` logging, Slack admin alert, wire `errorWorkflow` on WF01–WF03, and verify safe retry without duplicate emails or duplicate CRM contacts).
-5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md`, `n8n/workflows/wf03-automated-followup.json`.
+1. **Last Completed:** Completed **Day 12 — Error Handling (`WF04 - Error Handling & Logging`, id `ZEuoQ3p8ScYgsoz8`, 5 nodes, tags `wf04`/`error-handling`/`leadflow-ai`)** in `n8n/workflows/wf04-error-handling.json` (ADR-009): Error Trigger → secret-redacting normalizer → Supabase `workflow_errors` (`continueErrorOutput` fallback) → NoOp convergence → Slack Block Kit `[WORKFLOW ERROR]` alert in `#sales-leads`. Wired `settings.errorWorkflow = ZEuoQ3p8ScYgsoz8` and re-published `WF01`, `WF02`, and `WF03`. Live verified via production failure probe (WF04 exec `79`: DB `open` row with redacted tokens + Slack `ok: true`) and live safe-retry tests across WF01 (`409` duplicate `submission_id` + HubSpot upsert `is_new: false`), WF02 (`409` duplicate approve), and WF03 (failed follow-up no-spam + clean retry). All Day 12 test rows and probe workflow cleaned up; `leadflow-n8n-sanitize` passed across all 4 workflows.
+2. **Current State / Branch:** Clean `main` after merging `feat/day12-error-handling-wf04`. All 4 workflows (`WF01`, `WF02`, `WF03`, `WF04`) are `[ACTIVE]` on local n8n with credentials bound and `errorWorkflow` wired.
+3. **Blockers / Pending Actions:** Before running Day 13 automated Vitest suite (`tests/scripts/*.test.ts`), confirm whether to provision a dedicated Supabase test project (`TEST_SUPABASE_URL` per `TESTING_STRATEGY.md` / ADR-006) or obtain explicit approval for scoped test-prefix execution.
+4. **Next Immediate Action:** Branch `test/day13-e2e-report` from `main` and implement **Day 13 — Hybrid End-to-End Testing** (12–15 Vitest integration tests with async polling + dual API/DB PASS gate, 3–5 manual `test-form.html` scenarios, and `tests/reports/e2e-report.md`).
+5. **Key Reference Files:** `AGENTS.md`, `docs/TESTING_STRATEGY.md`, `test-data/mock-leads.json`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`39 / 51`)
+## 14-Day Master Roadmap Checklist (`43 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -93,11 +93,11 @@
 - [x] Send single conditional follow-up email with `Idempotency-Key`
 - [x] Stop sequence on reply, unsubscribe, `closed`, or `won`
 
-### Day 12 — Error Handling (`0 / 4`)
-- [ ] Create WF04 Error Trigger workflow
-- [ ] Record failures into `workflow_errors` table in Supabase
-- [ ] Send Slack admin alert on failure
-- [ ] Verify safe retries without duplicate emails or duplicate CRM contacts
+### Day 12 — Error Handling (`4 / 4`)
+- [x] Create WF04 Error Trigger workflow
+- [x] Record failures into `workflow_errors` table in Supabase
+- [x] Send Slack admin alert on failure
+- [x] Verify safe retries without duplicate emails or duplicate CRM contacts
 
 ### Day 13 — Hybrid End-to-End Testing (`0 / 4`)
 - [ ] Run automated Vitest tests: valid leads, missing fields, invalid email, auth checks

@@ -12,6 +12,7 @@
 | ADR-006 | 2026-11-22 | Accepted | Hybrid Testing Strategy (Vitest Integration + `test-form.html`) |
 | ADR-007 | 2026-11-23 | Accepted | Switch Primary LLM Provider to DeepSeek (`deepseek-chat`) |
 | ADR-008 | 2026-11-24 | Accepted | WF03 Deterministic Follow-up Template & Reconciliation |
+| ADR-009 | 2026-11-24 | Accepted | WF04 Global Error Handler, Secret Redaction & Slack Alert Fallback |
 
 ---
 
@@ -74,3 +75,13 @@
   - If a `sent` follow-up row already exists while the inquiry is still `scheduled` (partial failure), WF03 reconciles `followup_status='sent'` and logs `follow_up_reconciled_sent` instead of re-sending.
   - Per-run cap of 25 sends. `PostgREST in.(...)` filters are built only from regex-validated DB UUIDs.
 - **Consequences:** No new enum values or schema changes. Deterministic, replay-safe follow-ups; failed sends need manual or Day 12 retry.
+
+## ADR-009: WF04 Global Error Handler, Secret Redaction & Slack Alert Fallback
+- **Context:** Unhandled production failures in WF01–WF03 (timeouts, unwired errors, trigger failures) must be persisted to `public.workflow_errors` and alerted to admins on Slack without losing lead data, leaking secrets, or breaking if Supabase is temporarily down.
+- **Decision:**
+  - Build **WF04 (`WF04 - Error Handling & Logging`)** as a fast 5-node Error Trigger workflow (`Workflow Error Trigger` → `Normalize Error Context` → `Record Workflow Error` → `Prepare Admin Alert` NoOp → `Send Slack Admin Alert`), with **no `errorWorkflow` set on WF04 itself** to avoid error recursion.
+  - Wire WF04 as `settings.errorWorkflow` (with `saveDataErrorExecution: "all"`) on live `WF01`, `WF02`, and `WF03` in n8n. Keep instance-specific workflow IDs out of committed `wf01`–`wf03` JSON exports so `sync-workflows.ts --push` remains portable across environments.
+  - `Normalize Error Context` redacts bearer tokens, API key prefixes (`sk-`, `re_`, `pat-`, `xoxb-`, `xoxp-`, `n8n_api_`), and JWTs before DB write or Slack alert, caps `error_message` at 1000 chars, extracts `submission_id` (`sub_*`) when present, and leaves `inquiry_id = NULL` on generic Error Trigger payloads to prevent FK constraint failures.
+  - `Record Workflow Error` uses `onError: 'continueErrorOutput'` routed into the same `Prepare Admin Alert` NoOp convergence node so Slack still fires with an explicit DB-failure indicator if Supabase is unreachable.
+  - Per developer choice, WF04 posts `[WORKFLOW ERROR]` Block Kit alerts to `#sales-leads` (reusing the existing `Slack LeadFlow` bot channel) with direct links to the failed execution, workflow editor, and LeadFlow Dashboard.
+- **Consequences:** All 4 workflows (`WF01`–`WF04`) are now active and fault-isolated; safe retries are guaranteed by `inquiries.submission_id` (UNIQUE), `contacts` normalized email + HubSpot upsert, and `email_messages.idempotency_key` (UNIQUE) + Resend `Idempotency-Key`.
