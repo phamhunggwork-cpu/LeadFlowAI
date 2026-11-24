@@ -1,13 +1,67 @@
 import { AlertTriangle, CheckCircle2, Gauge, ShieldAlert } from 'lucide-react';
-import type { LeadAnalysisRecord } from '../../types/dashboard';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  PolarAngleAxis,
+  RadialBar,
+  RadialBarChart,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
+import { Separator } from '@/components/ui/separator';
+import type { LeadAnalysisRecord } from '@/types/dashboard';
 
 interface Props {
   analysis: LeadAnalysisRecord;
 }
 
+const SCORE_CHART_CONFIG: ChartConfig = {
+  score: { label: 'Qualification Score', color: '#2563eb' },
+  pct: { label: 'Axis Attainment', color: '#2563eb' },
+};
+
+function getScoreColor(pct: number): string {
+  if (pct >= 75) return '#10b981';
+  if (pct >= 45) return '#f59e0b';
+  return '#f43f5e';
+}
+
+function getScoreBadgeVariant(
+  score: number,
+): 'success' | 'warning' | 'danger' {
+  if (score >= 75) return 'success';
+  if (score >= 45) return 'warning';
+  return 'danger';
+}
+
+function getScoreTierLabel(score: number): string {
+  if (score >= 75) return 'Qualified Band';
+  if (score >= 45) return 'Needs Review Band';
+  return 'Not Qualified Band';
+}
+
 export function ScoreBreakdownCard({ analysis }: Props) {
   const breakdown = analysis.score_breakdown ?? {};
-  const score = analysis.qualification_score ?? breakdown.final_score ?? 0;
+  const score = Math.max(
+    0,
+    Math.min(100, analysis.qualification_score ?? breakdown.final_score ?? 0),
+  );
 
   const axes = [
     {
@@ -38,117 +92,202 @@ export function ScoreBreakdownCard({ analysis }: Props) {
       max: breakdown.project_clarity?.max ?? 20,
       reason: breakdown.project_clarity?.reason,
     },
-  ];
+  ].map((axis) => {
+    const pct =
+      axis.max > 0 ? Math.min(100, Math.round((axis.points / axis.max) * 100)) : 0;
+    return {
+      ...axis,
+      pct,
+      fill: getScoreColor(pct),
+    };
+  });
 
   const dealBreakers = Array.isArray(breakdown.deal_breakers)
     ? breakdown.deal_breakers
     : [];
   const overrides = Array.isArray(breakdown.overrides) ? breakdown.overrides : [];
 
-  const scoreRingColor =
-    score >= 75
-      ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
-      : score >= 45
-        ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
-        : 'border-rose-500/40 bg-rose-500/15 text-rose-300';
+  const gaugeColor = getScoreColor(score);
+  const gaugeData = [{ name: 'Score', score, fill: gaugeColor }];
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 pb-3">
         <div>
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Gauge className="h-4 w-4 text-sky-400" />
+          <CardTitle className="flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-primary" strokeWidth={1.75} />
             Deterministic Score Breakdown
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Computed by JS scoring rules (LLM never scores leads)
-          </p>
+          </CardTitle>
+          <CardDescription className="mt-1">
+            Computed strictly by JS scoring rules — LLM never scores leads
+          </CardDescription>
+        </div>
+        <Badge variant={getScoreBadgeVariant(score)} className="font-mono">
+          {getScoreTierLabel(score)}
+        </Badge>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-12 md:items-center">
+          {/* Radial Score Gauge */}
+          <div className="relative flex flex-col items-center justify-center rounded-xl border border-border bg-muted/40 p-3 md:col-span-4">
+            <ChartContainer
+              config={SCORE_CHART_CONFIG}
+              className="h-[144px] w-[144px]"
+            >
+              <RadialBarChart
+                data={gaugeData}
+                startAngle={215}
+                endAngle={-35}
+                innerRadius="72%"
+                outerRadius="100%"
+                barSize={12}
+              >
+                <PolarAngleAxis
+                  type="number"
+                  domain={[0, 100]}
+                  angleAxisId={0}
+                  tick={false}
+                />
+                <RadialBar
+                  dataKey="score"
+                  cornerRadius={8}
+                  background={{ fill: '#e2e8f0' }}
+                />
+              </RadialBarChart>
+            </ChartContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-mono text-3xl font-bold tracking-tight tabular-nums text-foreground">
+                {score}
+              </span>
+              <span className="font-mono text-[11px] font-medium text-muted-foreground">
+                / 100 pts
+              </span>
+            </div>
+          </div>
+
+          {/* 4-Axis Normalized Recharts Bar Chart */}
+          <div className="md:col-span-8">
+            <ChartContainer config={SCORE_CHART_CONFIG} className="h-[156px]">
+              <BarChart
+                data={axes}
+                layout="vertical"
+                margin={{ top: 4, right: 16, left: 4, bottom: 4 }}
+                barCategoryGap={10}
+              >
+                <CartesianGrid
+                  horizontal={false}
+                  strokeDasharray="3 3"
+                  stroke="#e2e8f0"
+                />
+                <XAxis
+                  type="number"
+                  domain={[0, 100]}
+                  tickFormatter={(value: number) => `${value}%`}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={11}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  width={100}
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={12}
+                />
+                <ChartTooltip
+                  cursor={{ fill: 'rgba(241, 245, 249, 0.7)' }}
+                  content={
+                    <ChartTooltipContent
+                      valueFormatter={(value, item) => {
+                        const row = item.payload as
+                          | { points?: number; max?: number }
+                          | undefined;
+                        if (row?.points !== undefined && row?.max !== undefined) {
+                          return `${row.points}/${row.max} pts (${value}%)`;
+                        }
+                        return `${value}%`;
+                      }}
+                    />
+                  }
+                />
+                <Bar dataKey="pct" radius={[0, 6, 6, 0]} maxBarSize={16}>
+                  {axes.map((axis) => (
+                    <Cell key={axis.key} fill={axis.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+          </div>
         </div>
 
-        <div
-          className={`flex items-baseline gap-1 rounded-xl border px-3.5 py-2 ${scoreRingColor}`}
-        >
-          <span className="text-2xl font-bold tabular-nums">{score}</span>
-          <span className="text-xs opacity-75">/ 100</span>
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3.5">
-        {axes.map((axis) => {
-          const pct = axis.max > 0 ? Math.min(100, Math.round((axis.points / axis.max) * 100)) : 0;
-          const barColor =
-            pct >= 75
-              ? 'bg-emerald-400'
-              : pct >= 45
-                ? 'bg-amber-400'
-                : 'bg-rose-400';
-
-          return (
-            <div key={axis.key} className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-slate-200">{axis.label}</span>
-                <span className="font-semibold tabular-nums text-slate-300">
+        {/* Axis Rationale List */}
+        <Separator />
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {axes.map((axis) => (
+            <div
+              key={axis.key}
+              className="rounded-lg border border-border/80 bg-muted/35 px-3 py-2.5"
+            >
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-medium text-foreground">{axis.label}</span>
+                <span className="font-mono font-semibold tabular-nums text-secondary-foreground">
                   {axis.points} / {axis.max}
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                <div
-                  className={`h-full rounded-full transition-all ${barColor}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
               {axis.reason && (
-                <p className="text-xs text-slate-400">{axis.reason}</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {axis.reason}
+                </p>
               )}
             </div>
-          );
-        })}
-      </div>
-
-      {dealBreakers.length > 0 && (
-        <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-rose-300">
-            <ShieldAlert className="h-4 w-4 shrink-0" />
-            Deal-Breaker Overrides Triggered
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {dealBreakers.map((item) => (
-              <span
-                key={item}
-                className="rounded-md border border-rose-500/30 bg-rose-950/60 px-2 py-0.5 font-mono text-[11px] text-rose-200"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
+          ))}
         </div>
-      )}
 
-      {overrides.length > 0 && dealBreakers.length === 0 && (
-        <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-            <AlertTriangle className="h-4 w-4 shrink-0" />
-            Routing Overrides Applied
+        {/* Deal-Breaker & Routing Override Notices */}
+        {dealBreakers.length > 0 && (
+          <div className="rounded-lg border border-danger-border bg-danger-soft p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-danger">
+              <ShieldAlert className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+              Deal-Breaker Overrides Triggered
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {dealBreakers.map((item) => (
+                <Badge key={item} variant="danger" className="font-mono text-[11px]">
+                  {item}
+                </Badge>
+              ))}
+            </div>
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {overrides.map((item) => (
-              <span
-                key={item}
-                className="rounded-md border border-amber-500/30 bg-amber-950/60 px-2 py-0.5 font-mono text-[11px] text-amber-200"
-              >
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
 
-      {dealBreakers.length === 0 && overrides.length === 0 && (
-        <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-          No deal-breaker or floor overrides triggered.
-        </div>
-      )}
-    </section>
+        {overrides.length > 0 && dealBreakers.length === 0 && (
+          <div className="rounded-lg border border-warning-border bg-warning-soft p-3">
+            <div className="flex items-center gap-2 text-xs font-semibold text-warning">
+              <AlertTriangle className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+              Routing Overrides Applied
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {overrides.map((item) => (
+                <Badge key={item} variant="warning" className="font-mono text-[11px]">
+                  {item}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {dealBreakers.length === 0 && overrides.length === 0 && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CheckCircle2
+              className="h-3.5 w-3.5 text-emerald-600"
+              strokeWidth={1.75}
+            />
+            No deal-breaker or floor overrides triggered.
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
