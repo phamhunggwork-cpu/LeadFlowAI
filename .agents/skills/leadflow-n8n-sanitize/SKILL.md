@@ -31,7 +31,7 @@ Follow these steps whenever an `n8n/workflows/*.json` file is created, exported,
    - Personal email addresses (only synthetic `@velocedigital.test` / `@example.com` / mock leads allowed)
 
 4. **Sanitize Sensitive Fields:**
-   - Replace hardcoded credential IDs or secrets with descriptive credential names/placeholders (e.g. `Supabase LeadFlow`, `OpenAI LeadFlow`, `HubSpot LeadFlow`, `Slack LeadFlow`) and use n8n expressions (`={{ $env.N8N_WEBHOOK_SECRET }}`) where appropriate.
+   - Replace hardcoded credential IDs or secrets with descriptive credential names/placeholders (e.g. `Supabase LeadFlow`, `DeepSeek LeadFlow`, `HubSpot Service Key account`, `Slack LeadFlow`, `Resend LeadFlow`) and use n8n expressions (`={{ $env.N8N_WEBHOOK_SECRET }}`) where appropriate.
    - Remove `pinData` containing real user/customer payloads or tokens before committing.
 
 5. **Confirm Clean Diff:**

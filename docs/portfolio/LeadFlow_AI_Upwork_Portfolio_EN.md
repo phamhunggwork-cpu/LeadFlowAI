@@ -207,9 +207,13 @@ Stores leads, statuses, processing history, and dashboard data.
 
 Provides real CRM integration for creating and updating contacts.
 
-**OpenAI or Gemini API**
+**DeepSeek API (`deepseek-chat`, provider-agnostic — ADR-007)**
 
-Analyzes inquiries, extracts information, and drafts emails.
+Analyzes inquiries, extracts structured data (JSON Mode + strict deterministic JS schema gate), and drafts personalized emails; the prompt and output schema remain provider-agnostic so OpenAI `gpt-4o-mini` or Gemini can be swapped in without changing downstream scoring or persistence.
+
+**Resend API**
+
+Delivers human-approved outreach emails (WF02) and conditional 24h follow-ups (WF03) with `Idempotency-Key` protection against duplicate sends.
 
 **Slack**
 
@@ -268,15 +272,13 @@ These are simulated rules intended to demonstrate that the scoring system can be
 
 AI can suggest email content, but it should not send the email immediately on its own.
 
-Process:
+Process (aligned with ADR-002):
 
-1. Receive the analyzed lead from Workflow 01.
-2. Save the email draft in Supabase.
-3. Display the lead on the dashboard.
-4. An employee opens the lead details and reviews the draft.
-5. The employee clicks Approve or Reject.
-6. The backend calls a dedicated n8n webhook.
-7. n8n validates the approval request, updates the status, and sends the email if approved.
+1. WF01 persists the immutable AI draft snapshot in `lead_analyses.draft_email` (audit) and creates the operational draft row in `email_messages` (`status='pending_approval'`, `idempotency_key='email:<inquiry_id>:initial'`).
+2. The lead, itemized score breakdown (`score_breakdown`), and email draft are displayed on the Supabase Auth + RLS protected dashboard.
+3. An employee reviews and optionally edits the draft, then clicks Approve or Reject.
+4. The Express backend verifies the reviewer JWT and calls the dedicated WF02 webhook (`x-webhook-secret`).
+5. WF02 validates the approval state, updates Supabase, and sends the email via Resend (`Idempotency-Key`) if approved—or marks `cancelled`/`closed` with zero emails sent if rejected.
 
 Approval and email delivery statuses are standardized per `LeadFlowAI.sql`:
 
@@ -390,6 +392,7 @@ Some important fields:
 - `scope_fit` (`high`, `medium`, `low`)
 - `spam_suspected`
 - `qualification_score`, `qualification_status`, `priority`
+- `score_breakdown` (`JSONB` — itemized 4-dimension breakdown & deal-breakers per ADR-004)
 - `draft_email` (original AI-generated draft snapshot for audit)
 
 **`email_messages`**
@@ -429,9 +432,9 @@ If you build a dashboard with user authentication, enable RLS and write appropri
 
 I recommend allocating **3–4 hours per day**, for a total of approximately 42–56 hours. This plan is for a portfolio version with a basic dashboard and HubSpot integration, not a complete commercial CRM.
 
-**Project progress tracker**
+**Project progress tracker (Synced Day 14 — 2026-11-24)**
 
-**Progress: 6/51 tasks**
+**Progress: 50/51 tasks** *(100% of code, workflows, `20/20 PASS` E2E verification, documentation, and local `v1.0.0` release tag complete; only the 60–90s screen-capture demo video remains using the walkthrough in `README.md`)*
 
 ### Day 1 — Define the business problem and requirements
 
@@ -455,132 +458,132 @@ I recommend allocating **3–4 hours per day**, for a total of approximately 42�
 
 ### Day 3 — Build Lead Intake
 
-**Progress: 0/3 tasks**
+**Progress: 3/3 tasks**
 
-- [ ] Create the React form.
-- [ ] Create an intermediary Node API that securely calls the webhook.
-- [ ] Create the Webhook Trigger in n8n.
+- [x] Create the React form.
+- [x] Create an intermediary Node API that securely calls the webhook.
+- [x] Create the Webhook Trigger in n8n.
 
 > **Completion criteria:** Form submissions successfully reach the workflow.
 
 ### Day 4 — Validation and duplicate prevention
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Validate required fields and email addresses.
-- [ ] Normalize data with a Code node.
-- [ ] Generate a `submission_id` and implement an idempotency check.
-- [ ] Save the inquiry to Supabase.
+- [x] Validate required fields and email addresses.
+- [x] Normalize data with a Code node.
+- [x] Generate a `submission_id` and implement an idempotency check.
+- [x] Save the inquiry to Supabase.
 
 > **Completion criteria:** Valid data is stored, and duplicate requests are not processed again.
 
 ### Day 5 — AI Qualification
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Write the system prompt and extraction criteria.
-- [ ] Connect the model API.
-- [ ] Require AI to return output that follows a JSON schema.
-- [ ] Validate and handle invalid output.
+- [x] Write the system prompt and extraction criteria.
+- [x] Connect the model API (`DeepSeek deepseek-chat`, ADR-007).
+- [x] Require AI to return output that follows a JSON schema (JSON Mode + strict JS schema gate).
+- [x] Validate and handle invalid output.
 
 > **Completion criteria:** AI consistently returns structured results.
 
 ### Day 6 — Lead Scoring & Routing
 
-**Progress: 0/3 tasks**
+**Progress: 3/3 tasks**
 
-- [ ] Write the scoring rules in JavaScript.
-- [ ] Create Qualified / Needs Review / Not Qualified branches.
-- [ ] Save scores and explanations to the database.
+- [x] Write the scoring rules in JavaScript.
+- [x] Create Qualified / Needs Review / Not Qualified branches.
+- [x] Save scores and explanations (`score_breakdown`) to the database.
 
 > **Completion criteria:** Leads are classified according to the defined rules.
 
 ### Day 7 — HubSpot Integration
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Set up the appropriate HubSpot developer/private app access.
-- [ ] Configure the credentials in n8n.
-- [ ] Create or update contacts using their email addresses.
-- [ ] Check field mapping and API error handling.
+- [x] Set up the appropriate HubSpot developer/private app access.
+- [x] Configure the credentials in n8n.
+- [x] Create or update contacts using their email addresses.
+- [x] Check field mapping and API error handling.
 
 > **Completion criteria:** Leads are synchronized with HubSpot.
 
 ### Day 8 — Slack Notifications
 
-**Progress: 0/3 tasks**
+**Progress: 3/3 tasks**
 
-- [ ] Create a Slack app or configure an appropriate webhook.
-- [ ] Compose the notification message.
-- [ ] Send alerts only for leads that meet the priority conditions.
+- [x] Create a Slack app or configure an appropriate webhook.
+- [x] Compose the notification message.
+- [x] Send alerts only for leads that meet the priority conditions (`qualified` & `needs_review`).
 
 > **Completion criteria:** Employees receive notifications containing the necessary information.
 
 ### Day 9 — Human Approval
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Create a simple lead-review screen.
-- [ ] Display the AI summary and email draft.
-- [ ] Build the approve/reject endpoint.
-- [ ] Authenticate the request before executing the action.
+- [x] Create a simple lead-review screen (React Dashboard + Supabase Auth/RLS).
+- [x] Display the AI summary and email draft.
+- [x] Build the approve/reject endpoint.
+- [x] Authenticate the request before executing the action.
 
 > **Completion criteria:** Users can review and approve leads through the dashboard.
 
 ### Day 10 — Email Automation
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Connect an email provider.
-- [ ] Send emails only after approval.
-- [ ] Store email-sending history.
-- [ ] Prevent the same email from being sent more than once.
+- [x] Connect an email provider (Resend API).
+- [x] Send emails only after approval.
+- [x] Store email-sending history (`email_messages` + `activity_logs`).
+- [x] Prevent the same email from being sent more than once (`idempotency_key` + `Idempotency-Key`).
 
 > **Completion criteria:** Emails are sent and logged.
 
 ### Day 11 — Follow-up Automation
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Create a scheduler to find leads that are due for follow-up.
-- [ ] Check lead status, consent, and replies.
-- [ ] Send one conditional follow-up email.
-- [ ] Stop the sequence when a lead replies or unsubscribes.
+- [x] Create a scheduler to find leads that are due for follow-up (WF03 Schedule Trigger).
+- [x] Check lead status, consent, and replies.
+- [x] Send one conditional follow-up email.
+- [x] Stop the sequence when a lead replies or unsubscribes.
 
 > **Completion criteria:** Follow-ups work according to the defined conditions.
 
 ### Day 12 — Error Handling
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Create an Error Trigger workflow.
-- [ ] Record errors in Supabase.
-- [ ] Send Slack alerts when errors occur.
-- [ ] Test retries and action-level duplicate prevention.
+- [x] Create an Error Trigger workflow (WF04, wired to WF01–WF03).
+- [x] Record errors in Supabase (`workflow_errors`, with secret redaction).
+- [x] Send Slack alerts when errors occur (with fallback if DB write fails).
+- [x] Test retries and action-level duplicate prevention.
 
 > **Completion criteria:** Errors are recorded and recovery procedures are available.
 
 ### Day 13 — End-to-end system testing
 
-**Progress: 0/4 tasks**
+**Progress: 4/4 tasks**
 
-- [ ] Test valid leads, missing fields, and invalid email addresses.
-- [ ] Test duplicates and repeated webhook deliveries.
-- [ ] Test invalid AI output, API failures, and rejected approvals.
-- [ ] Verify that emails are not sent without consent or approval.
+- [x] Test valid leads, missing fields, and invalid email addresses.
+- [x] Test duplicates and repeated webhook deliveries.
+- [x] Test invalid AI output, API failures, and rejected approvals.
+- [x] Verify that emails are not sent without consent or approval (`tests/reports/e2e-report.md` — `20/20 PASS`).
 
-> **Completion criteria:** A test report documents the results.
+> **Completion criteria:** A test report documents the results (`15/15` Vitest + `5/5` manual form).
 
 ### Day 14 — Finalize the portfolio
 
-**Progress: 0/4 tasks**
+**Progress: 3/4 tasks**
 
-- [ ] Clean up the UI and demo data.
-- [ ] Export workflow JSON files after removing sensitive information.
-- [ ] Write the README and architecture diagram.
-- [ ] Record a 60–90-second demo video.
+- [x] Clean up the UI and demo data (`5` clean synthetic demo leads, `0` workflow errors).
+- [x] Export workflow JSON files after removing sensitive information (`WF01`–`WF04`, `leadflow-n8n-sanitize` PASS).
+- [x] Write the README and architecture diagram (`README.md` + 60–90s demo script + `v1.0.0` tag).
+- [ ] Record a 60–90-second demo video *(ready to capture using the script in `README.md` Section 9)*.
 
-> **Completion criteria:** The product, source files, and demo video are ready to showcase on Upwork.
+> **Completion criteria:** Source files, sanitized workflows, test report, and demo script are ready; record the 60–90s video to publish on Upwork.
 
 ### What you should not build during the first 14 days
 
@@ -623,6 +626,8 @@ In particular, make the database statuses explicit so that a workflow retry does
 
 When you finish, publish the actual test results—for example, how many scenarios you tested and how many passed. Do not claim that the system achieves 100% accuracy or saves 80% of the time unless you have measured those figures.
 
+> **Actual Verified Test Results (2026-11-24 — [tests/reports/e2e-report.md](../../tests/reports/e2e-report.md)):** **`20 / 20` PASS** — **`15 / 15`** automated Vitest integration tests (`48.09s`, Dual API + Supabase DB verified) + **`5 / 5`** manual `tests/test-form.html` scenarios, clean `tsc --noEmit` across backend and frontend, and `0` residual test rows after teardown.
+
 ## 8. Turning the Project into a Strong Upwork Portfolio
 
 Do not simply upload a screenshot of an n8n workflow to Upwork. Package the project as a case study.
@@ -661,17 +666,15 @@ Submit a sample lead → AI analyzes it → CRM is updated → Slack notificatio
 
 ### Suggested Upwork portfolio title
 
-**AI Lead Management & CRM Automation with n8n, OpenAI, HubSpot and Supabase**
+**AI Lead Management & CRM Automation with n8n, DeepSeek/OpenAI, HubSpot, Resend and Supabase**
 
-You can use the following short description:
+You can use the following short description *(all listed capabilities are implemented and verified `20/20 PASS`)*:
 
-> Designed and built an AI-powered lead management system using n8n, OpenAI, Supabase, and HubSpot.
+> Designed and built an AI-powered lead management system using n8n (4 modular workflows), DeepSeek LLM (provider-agnostic, swappable with OpenAI/Gemini), Supabase (PostgreSQL + Auth + RLS), HubSpot CRM, Resend, and Slack.
 >
-> The system captures website inquiries, validates and deduplicates lead data, uses AI to analyze customer requirements, assigns qualification scores, synchronizes CRM records, and sends internal notifications.
+> The system captures website inquiries, validates and deduplicates lead data, uses AI for structured extraction and email drafting with deterministic JavaScript scoring, synchronizes CRM records, and sends internal Slack alerts.
 >
-> It also includes human approval before customer-facing emails, automated follow-ups, execution logging, and error handling.
-
-Only use this description after the corresponding features have actually been completed and tested.
+> It enforces Human-in-the-Loop (HITL) approval before customer-facing emails, conditional 24h follow-ups with unsubscribe/reply stop rules, centralized error logging, and is verified by 20/20 end-to-end integration tests (15 automated Vitest + 5 manual scenarios).
 
 ### What clients should be able to see
 

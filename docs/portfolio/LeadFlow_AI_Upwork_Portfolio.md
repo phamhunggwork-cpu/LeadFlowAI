@@ -192,9 +192,13 @@ Lưu lead, trạng thái, lịch sử xử lý và dữ liệu dashboard.
 
 Tích hợp CRM thực tế, tạo và cập nhật contact.
 
-**OpenAI hoặc Gemini API**
+**DeepSeek API (`deepseek-chat`, provider-agnostic — ADR-007)**
 
-Phân tích yêu cầu, trích xuất dữ liệu và soạn email.
+Phân tích yêu cầu, trích xuất dữ liệu có cấu trúc (JSON Mode + strict JS schema gate) và soạn email nháp; prompt & schema độc lập nhà cung cấp nên có thể chuyển đổi sang OpenAI `gpt-4o-mini` hoặc Gemini mà không đổi logic chấm điểm phía sau.
+
+**Resend API**
+
+Gửi email sau phê duyệt (WF02) và follow-up có điều kiện (WF03) kèm `Idempotency-Key` chống gửi trùng.
 
 **Slack**
 
@@ -257,15 +261,13 @@ Ví dụ hệ thống có thể sử dụng bộ tiêu chí:
 
 AI có thể đề xuất nội dung email, nhưng không nên tự động gửi ngay.
 
-Quy trình:
+Quy trình (đồng bộ ADR-002):
 
-1. Nhận lead đã phân tích từ Workflow 01.
-2. Lưu bản nháp email trong Supabase.
-3. Hiển thị lead trên dashboard.
-4. Nhân viên mở thông tin và đọc bản nháp.
-5. Nhấn Approve hoặc Reject.
-6. Backend gọi một webhook riêng của n8n.
-7. n8n xác thực yêu cầu duyệt, cập nhật trạng thái và gửi email nếu được chấp thuận.
+1. WF01 lưu bản nháp gốc AI vào `lead_analyses.draft_email` (audit) và tạo bản nháp vận hành trong `email_messages` (`status='pending_approval'`, `idempotency_key='email:<inquiry_id>:initial'`).
+2. Hiển thị lead, điểm số chi tiết (`score_breakdown`) và bản nháp email trên dashboard có xác thực Supabase Auth + RLS.
+3. Nhân viên mở thông tin, chỉnh sửa nội dung (nếu cần) và nhấn Approve hoặc Reject.
+4. Backend xác thực JWT và gọi webhook riêng của WF02 (`x-webhook-secret`).
+5. WF02 kiểm tra trạng thái duyệt, cập nhật DB và gửi email qua Resend (`Idempotency-Key`) nếu được chấp thuận, hoặc chuyển `cancelled`/`closed` nếu bị từ chối.
 
 Các trạng thái duyệt và gửi email được chuẩn hóa theo `LeadFlowAI.sql`:
 
@@ -373,6 +375,7 @@ Một số field quan trọng:
 - `scope_fit` (`high`, `medium`, `low`)
 - `spam_suspected`
 - `qualification_score`, `qualification_status`, `priority`
+- `score_breakdown` (`JSONB` — chi tiết điểm 4 tiêu chí & deal-breakers theo ADR-004)
 - `draft_email` (bản nháp gốc AI sinh ra để lưu vết)
 
 **email_messages**
@@ -410,9 +413,9 @@ Nếu làm dashboard có đăng nhập, hãy bật RLS và viết policy phù h�
 ## 6. Roadmap thực hiện trong 14 ngày
 Mình đề xuất khoảng **3–4 giờ mỗi ngày**, tổng cộng khoảng 42–56 giờ. Đây là kế hoạch cho một phiên bản portfolio có dashboard cơ bản và tích hợp HubSpot, không phải một CRM thương mại đầy đủ.
 
-**Theo dõi tiến độ dự án**
+**Theo dõi tiến độ dự án (Đồng bộ Day 14 — 2026-11-24)**
 
-**Tiến độ: 6/51 nhiệm vụ**
+**Tiến độ: 50/51 nhiệm vụ** *(hoàn tất 100% hệ thống, kiểm thử E2E `20/20 PASS`, tài liệu & tag `v1.0.0`; còn duy nhất thao tác quay màn hình video 60–90s bằng kịch bản trong `README.md`)*
 
 #### Ngày 1 — Chốt bài toán và nghiệp vụ
 
@@ -436,132 +439,132 @@ Mình đề xuất khoảng **3–4 giờ mỗi ngày**, tổng cộng khoảng 
 
 #### Ngày 3 — Xây dựng Lead Intake
 
-**Tiến độ: 0/3 nhiệm vụ**
+**Tiến độ: 3/3 nhiệm vụ**
 
-- [ ] Tạo React form
-- [ ] Tạo Node API trung gian gọi webhook có xác thực
-- [ ] Tạo Webhook Trigger trong n8n
+- [x] Tạo React form
+- [x] Tạo Node API trung gian gọi webhook có xác thực
+- [x] Tạo Webhook Trigger trong n8n
 
 > **Hoàn thành: Gửi form thành công tới workflow**
 
 #### Ngày 4 — Validation và chống trùng
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Kiểm tra dữ liệu bắt buộc và email
-- [ ] Chuẩn hóa dữ liệu bằng Code node
-- [ ] Tạo submission_id và idempotency check
-- [ ] Lưu inquiry vào Supabase
+- [x] Kiểm tra dữ liệu bắt buộc và email
+- [x] Chuẩn hóa dữ liệu bằng Code node
+- [x] Tạo submission_id và idempotency check
+- [x] Lưu inquiry vào Supabase
 
 > **Hoàn thành: Dữ liệu hợp lệ được lưu, request trùng không xử lý lại**
 
 #### Ngày 5 — AI Qualification
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Viết system prompt và tiêu chí trích xuất
-- [ ] Kết nối model API
-- [ ] Yêu cầu AI trả kết quả theo JSON schema
-- [ ] Kiểm tra và xử lý output lỗi
+- [x] Viết system prompt và tiêu chí trích xuất
+- [x] Kết nối model API (`DeepSeek deepseek-chat`, ADR-007)
+- [x] Yêu cầu AI trả kết quả theo JSON schema (JSON Mode + strict JS schema gate)
+- [x] Kiểm tra và xử lý output lỗi
 
 > **Hoàn thành: AI trả kết quả có cấu trúc ổn định**
 
 #### Ngày 6 — Lead Scoring & Routing
 
-**Tiến độ: 0/3 nhiệm vụ**
+**Tiến độ: 3/3 nhiệm vụ**
 
-- [ ] Viết scoring rules bằng JavaScript
-- [ ] Tạo nhánh Qualified / Needs Review / Not Qualified
-- [ ] Lưu điểm số và lý do vào database
+- [x] Viết scoring rules bằng JavaScript
+- [x] Tạo nhánh Qualified / Needs Review / Not Qualified
+- [x] Lưu điểm số và lý do (`score_breakdown`) vào database
 
 > **Hoàn thành: Các lead được phân loại theo đúng quy tắc**
 
 #### Ngày 7 — HubSpot Integration
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Tạo HubSpot developer/private app access phù hợp
-- [ ] Kết nối credential trong n8n
-- [ ] Tạo hoặc cập nhật contact bằng email
-- [ ] Kiểm tra field mapping và lỗi API
+- [x] Tạo HubSpot developer/private app access phù hợp
+- [x] Kết nối credential trong n8n
+- [x] Tạo hoặc cập nhật contact bằng email
+- [x] Kiểm tra field mapping và lỗi API
 
 > **Hoàn thành: Lead được đồng bộ lên HubSpot**
 
 #### Ngày 8 — Slack Notification
 
-**Tiến độ: 0/3 nhiệm vụ**
+**Tiến độ: 3/3 nhiệm vụ**
 
-- [ ] Tạo Slack app hoặc webhook phù hợp
-- [ ] Soạn nội dung thông báo
-- [ ] Chỉ gửi cảnh báo ưu tiên cho những lead đạt điều kiện
+- [x] Tạo Slack app hoặc webhook phù hợp
+- [x] Soạn nội dung thông báo
+- [x] Chỉ gửi cảnh báo ưu tiên cho những lead đạt điều kiện (`qualified` & `needs_review`)
 
 > **Hoàn thành: Nhân viên nhận được thông báo có đủ thông tin**
 
 #### Ngày 9 — Human Approval
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Tạo màn hình lead review đơn giản
-- [ ] Hiển thị AI summary và email draft
-- [ ] Xây dựng approve/reject endpoint
-- [ ] Xác thực yêu cầu trước khi thực thi
+- [x] Tạo màn hình lead review đơn giản (React Dashboard + Supabase Auth/RLS)
+- [x] Hiển thị AI summary và email draft
+- [x] Xây dựng approve/reject endpoint
+- [x] Xác thực yêu cầu trước khi thực thi
 
 > **Hoàn thành: Người dùng duyệt được lead qua dashboard**
 
 #### Ngày 10 — Email Automation
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Kết nối email provider
-- [ ] Gửi email chỉ sau khi có approval
-- [ ] Lưu lịch sử gửi email
-- [ ] Ngăn gửi lại cùng một email
+- [x] Kết nối email provider (Resend API)
+- [x] Gửi email chỉ sau khi có approval
+- [x] Lưu lịch sử gửi email (`email_messages` + `activity_logs`)
+- [x] Ngăn gửi lại cùng một email (`idempotency_key` + `Idempotency-Key`)
 
 > **Hoàn thành: Email được gửi và có log**
 
 #### Ngày 11 — Follow-up Automation
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Tạo scheduler tìm lead đến hạn
-- [ ] Kiểm tra trạng thái, consent và reply
-- [ ] Gửi một email follow-up có điều kiện
-- [ ] Dừng chuỗi khi lead phản hồi hoặc unsubscribe
+- [x] Tạo scheduler tìm lead đến hạn (WF03 Schedule Trigger)
+- [x] Kiểm tra trạng thái, consent và reply
+- [x] Gửi một email follow-up có điều kiện
+- [x] Dừng chuỗi khi lead phản hồi hoặc unsubscribe
 
 > **Hoàn thành: Follow-up hoạt động đúng điều kiện**
 
 #### Ngày 12 — Error Handling
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Tạo Error Trigger workflow
-- [ ] Ghi lỗi vào Supabase
-- [ ] Gửi Slack alert khi lỗi
-- [ ] Kiểm thử retry và chống lặp hành động
+- [x] Tạo Error Trigger workflow (WF04, gắn vào WF01–WF03)
+- [x] Ghi lỗi vào Supabase (`workflow_errors`, đã redaction secrets)
+- [x] Gửi Slack alert khi lỗi (có fallback nếu DB lỗi)
+- [x] Kiểm thử retry và chống lặp hành động
 
 > **Hoàn thành: Lỗi được ghi nhận và có cách khôi phục**
 
 #### Ngày 13 — Kiểm thử toàn hệ thống
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 4/4 nhiệm vụ**
 
-- [ ] Test lead hợp lệ, thiếu field và email sai
-- [ ] Test duplicate và webhook gửi lặp
-- [ ] Test AI output sai, API lỗi và approval bị từ chối
-- [ ] Test không gửi email khi chưa có consent hoặc approval
+- [x] Test lead hợp lệ, thiếu field và email sai
+- [x] Test duplicate và webhook gửi lặp
+- [x] Test AI output sai, API lỗi và approval bị từ chối
+- [x] Test không gửi email khi chưa có consent hoặc approval (`tests/reports/e2e-report.md` — `20/20 PASS`)
 
-> **Hoàn thành: Có test report ghi rõ kết quả**
+> **Hoàn thành: Có test report ghi rõ kết quả (`15/15` Vitest + `5/5` manual form)**
 
 #### Ngày 14 — Hoàn thiện Portfolio
 
-**Tiến độ: 0/4 nhiệm vụ**
+**Tiến độ: 3/4 nhiệm vụ**
 
-- [ ] Làm sạch UI và dữ liệu demo
-- [ ] Export workflow JSON đã loại bỏ thông tin nhạy cảm
-- [ ] Viết README và sơ đồ kiến trúc
-- [ ] Quay demo video 60–90 giây
+- [x] Làm sạch UI và dữ liệu demo (`5` lead demo tổng hợp, `0` lỗi DB)
+- [x] Export workflow JSON đã loại bỏ thông tin nhạy cảm (`WF01`–`WF04`, `leadflow-n8n-sanitize` PASS)
+- [x] Viết README và sơ đồ kiến trúc (`README.md` + kịch bản demo 60–90s + tag `v1.0.0`)
+- [ ] Quay demo video 60–90 giây *(thực hiện bằng kịch bản trong `README.md` mục 9)*
 
-> **Hoàn thành: Có sản phẩm, mã nguồn và video để đưa vào Upwork**
+> **Hoàn thành bàn giao mã nguồn & tài liệu: sẵn sàng quay video 60–90s và đăng Upwork**
 
 ### Những phần không nên làm trong 14 ngày đầu
 Để tránh dự án bị phình quá lớn, mình khuyên chưa nên làm:
@@ -602,6 +605,8 @@ Hãy tạo tối thiểu 15–20 tình huống test. Trong đó, các trường 
 
 Khi hoàn thành, hãy công bố kết quả test thực tế, chẳng hạn số trường hợp đã kiểm thử và bao nhiêu trường hợp pass. Đừng tự ghi rằng hệ thống đạt độ chính xác 100% hay tiết kiệm 80% thời gian nếu bạn chưa đo được những con số đó.
 
+> **Kết quả kiểm thử thực tế (2026-11-24 — [tests/reports/e2e-report.md](../../tests/reports/e2e-report.md)):** **`20 / 20` PASS** — gồm **`15 / 15`** bài test tích hợp tự động bằng Vitest (`48.09s`, xác minh kép API + Supabase DB) và **`5 / 5`** kịch bản thủ công trên `tests/test-form.html`, kèm `tsc --noEmit` sạch lỗi và `0` bản ghi rác còn sót sau teardown.
+
 ## 8. Cách biến dự án thành một Portfolio mạnh trên Upwork
 Đừng chỉ đăng một ảnh chụp workflow n8n lên Upwork. Hãy đóng gói nó thành một case study.
 
@@ -638,17 +643,15 @@ Gửi một lead giả lập → AI phân tích → CRM cập nhật → nhận 
 - File JSON workflow đã làm sạch thông tin nhạy cảm.
 
 ### Gợi ý tên Portfolio trên Upwork
-**AI Lead Management & CRM Automation with n8n, OpenAI, HubSpot and Supabase**
+**AI Lead Management & CRM Automation with n8n, DeepSeek/OpenAI, HubSpot, Resend and Supabase**
 
-Mô tả ngắn có thể dùng:
+Mô tả ngắn có thể dùng *(toàn bộ tính năng đã hoàn thành và kiểm thử `20/20 PASS`)*:
 
-> Designed and built an AI-powered lead management system using n8n, OpenAI, Supabase, and HubSpot.
+> Designed and built an AI-powered lead management system using n8n (4 modular workflows), DeepSeek LLM (provider-agnostic, swappable with OpenAI/Gemini), Supabase (PostgreSQL + Auth + RLS), HubSpot CRM, Resend, and Slack.
 >
-> The system captures website inquiries, validates and deduplicates lead data, uses AI to analyze customer requirements, assigns qualification scores, synchronizes CRM records, and sends internal notifications.
+> The system captures website inquiries, validates and deduplicates lead data, uses AI for structured extraction and email drafting with deterministic JavaScript scoring, synchronizes CRM records, and sends internal Slack alerts.
 >
-> It also includes human approval before customer-facing emails, automated follow-ups, execution logging, and error handling.
-
-Nhớ chỉ sử dụng phần mô tả này sau khi tính năng tương ứng đã hoàn thành và kiểm thử được.
+> It enforces Human-in-the-Loop (HITL) approval before customer-facing emails, conditional 24h follow-ups with unsubscribe/reply stop rules, centralized error logging, and is verified by 20/20 end-to-end integration tests (15 automated Vitest + 5 manual scenarios).
 
 ### Điều khách hàng nên nhìn thấy
 Khách hàng không cần hiểu bạn sử dụng bao nhiêu node trong n8n. Họ cần biết:
