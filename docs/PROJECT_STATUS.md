@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 10 (Email Automation — WF02)
-- **Active Git Branch:** `main` *(Day 9 & Crisp Light SaaS UI upgrade merged; ready to branch `feat/day10-email-automation`)*
-- **Overall Progress:** `31 / 51` roadmap tasks completed (`60.8%`)
+- **Current Roadmap Day:** Day 11 (Follow-up Automation — WF03)
+- **Active Git Branch:** `main` *(Day 10 WF02 merged; ready to branch `feat/day11-followup-wf03`)*
+- **Overall Progress:** `35 / 51` roadmap tasks completed (`68.6%`)
 - **Last Updated:** 2026-11-24
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Merged **Day 9 — Human Approval Dashboard** (`6ddf2a6`) and the **Crisp Light SaaS Frontend Design System Upgrade** (`404aaf0`) into `main`: added `docs/DESIGN.md`, `.agents/rules/frontend-ui.md`, `.agents/skills/leadflow-frontend-ui/SKILL.md`, Typography (`Plus Jakarta Sans` + `Inter` + `JetBrains Mono`), 15 `shadcn/ui` + Radix UI primitives, Recharts (`ScoreBreakdownCard` radial gauge + 4-axis bar chart & `PipelineAnalyticsChart`), brand assets (`veloce-hero-backdrop.jpg`, `empty-queue.jpg`), Vite `manualChunks`, refactored all 3 pages (`/`, `/login`, `/dashboard`), and verified via `typecheck`, `vite build` (0 warnings), `0` secret hits, and 2-pass Visual Critique Loop (`1440x900` & `390x844`).
-2. **Current State / Branch:** Clean working tree on `main` (`404aaf0`). Day 9 & Crisp Light UI upgrade are both landed on `main` (unpushed locally unless pushed to `origin/main`).
-3. **Blockers / Pending Actions:** Configure **Resend API** credential (`RESEND_API_KEY`) in local n8n before implementing Day 10 (`WF02 — Human Approval & Email Sending`). Deferred non-blocking item: separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Branch `feat/day10-email-automation` from `main` to build **Day 10 — Email Automation (`WF02`)**: webhook trigger `/webhook/lead-approval` (`x-webhook-secret`), `approval_status`/`email_messages` guard + `idempotency_key` (`email:<inquiry_id>:initial`), Resend API delivery with `Idempotency-Key`, DB updates (`email_messages`, `inquiries.lead_status='contacted'`, `followup_status='scheduled'`, `activity_logs`), and reject path (`rejected`/`cancelled`/`closed`).
-5. **Key Reference Files:** `AGENTS.md`, `docs/DESIGN.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md` (ADR-002), `backend/src/services/n8n.service.ts`.
+1. **Last Completed:** Merged **Day 10 — Email Automation (`WF02 - Human Approval & Email Sending`, id `009W0gN8GheJZBoF`, 27 nodes, 4 node groups)** into `main` (`n8n/workflows/wf02-human-approval-email.json`): `x-webhook-secret` auth, Set IIFE payload validator, pending-state & `email:<inquiry_id>:initial` idempotency guard (`404`/`409`), queued draft lock, Resend API delivery (`Veloce Digital <onboarding@resend.dev>`, `Resend LeadFlow` Bearer Auth, `Idempotency-Key` header), Supabase state transitions (`email_messages`, `inquiries.lead_status='contacted'`, conditional `followup_status='scheduled'|'not_eligible'`, `activity_logs`), Resend failure isolation (`failed` + `workflow_errors` + HTTP `502`), and zero-email reject path (`cancelled`/`rejected`/`closed`). All 7/7 live API+Resend+DB checks, `typecheck`, and `leadflow-n8n-sanitize` passed.
+2. **Current State / Branch:** Clean working tree on `main`. Both `WF01` (`Mynf0z0HIudjtNXF`) and `WF02` (`009W0gN8GheJZBoF`) are `[ACTIVE]` on local n8n.
+3. **Blockers / Pending Actions:** No Day 11 blockers (`Resend LeadFlow` and `Supabase LeadFlow` are configured; Resend sandbox sends from `onboarding@resend.dev` to the Resend account owner email or `delivered+*@resend.dev` until a custom domain is verified). Deferred non-blocking item: separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Branch `feat/day11-followup-wf03` from `main` to build **Day 11 — Automated Follow-up (`WF03`)**: Schedule Trigger querying 24h+ `contacted` + `followup_status='scheduled'` + `consent_to_email=true` + `unsubscribed_at IS NULL` leads, single follow-up via Resend (`Idempotency-Key: email:<inquiry_id>:follow_up_1`), updating `email_messages`, `inquiries.followup_status='sent'`, and `activity_logs`.
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md`, `n8n/workflows/wf02-human-approval-email.json`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`31 / 51`)
+## 14-Day Master Roadmap Checklist (`35 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -81,11 +81,11 @@
 - [x] Build authenticated Approve / Reject endpoints (`backend/`)
 - [x] Verify JWT authentication & authorization before executing actions
 
-### Day 10 — Email Automation (`0 / 4`)
-- [ ] Connect Resend email provider in WF02
-- [ ] Send initial email ONLY after explicit human approval
-- [ ] Log delivery (`email_messages.status`, `provider_message_id`, `sent_at`) and `activity_logs`
-- [ ] Prevent duplicate sending via `idempotency_key` (`email:<inquiry_id>:initial`)
+### Day 10 — Email Automation (`4 / 4`)
+- [x] Connect Resend email provider in WF02
+- [x] Send initial email ONLY after explicit human approval
+- [x] Log delivery (`email_messages.status`, `provider_message_id`, `sent_at`) and `activity_logs`
+- [x] Prevent duplicate sending via `idempotency_key` (`email:<inquiry_id>:initial`)
 
 ### Day 11 — Follow-up Automation (`0 / 4`)
 - [ ] Create WF03 Schedule Trigger querying 24h+ eligible leads
