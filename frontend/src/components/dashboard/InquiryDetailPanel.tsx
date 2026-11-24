@@ -15,12 +15,9 @@ import {
   User,
 } from 'lucide-react';
 import { useState } from 'react';
-import type {
-  InquiryDetailResponse,
-  ManualLeadStatus,
-} from '../../types/dashboard';
-import { EmailDraftCard } from './EmailDraftCard';
-import { ScoreBreakdownCard } from './ScoreBreakdownCard';
+import { toast } from 'sonner';
+import { EmailDraftCard } from '@/components/dashboard/EmailDraftCard';
+import { ScoreBreakdownCard } from '@/components/dashboard/ScoreBreakdownCard';
 import {
   ApprovalBadge,
   FollowupBadge,
@@ -28,7 +25,21 @@ import {
   PriorityBadge,
   formatBudgetRange,
   formatDateTime,
-} from './StatusBadges';
+} from '@/components/dashboard/StatusBadges';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import type {
+  InquiryDetailResponse,
+  ManualLeadStatus,
+} from '@/types/dashboard';
 
 interface Props {
   detail: InquiryDetailResponse;
@@ -53,8 +64,13 @@ export function InquiryDetailPanel({
   onReject,
   onUpdateStatus,
 }: Props) {
-  const { inquiry, latest_analysis, initial_email, activity_logs, workflow_errors } =
-    detail;
+  const {
+    inquiry,
+    latest_analysis,
+    initial_email,
+    activity_logs,
+    workflow_errors,
+  } = detail;
   const contact = inquiry.contact;
 
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
@@ -73,12 +89,12 @@ export function InquiryDetailPanel({
     try {
       await onUpdateStatus(payload);
       setStatusFeedback({ type: 'success', message: successMessage });
+      toast.success(successMessage);
     } catch (err: unknown) {
-      setStatusFeedback({
-        type: 'error',
-        message:
-          err instanceof Error ? err.message : 'Failed to update inquiry status.',
-      });
+      const msg =
+        err instanceof Error ? err.message : 'Failed to update inquiry status.';
+      setStatusFeedback({ type: 'error', message: msg });
+      toast.error('Status update failed', { description: msg });
     } finally {
       setStatusLoading(null);
     }
@@ -87,174 +103,194 @@ export function InquiryDetailPanel({
   return (
     <div className="space-y-5">
       {/* Header & Contact Summary */}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1.5">
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-display text-xl font-bold tracking-tight text-foreground">
+                  {contact?.full_name ?? 'Unknown Contact'}
+                </h2>
+                <PriorityBadge priority={inquiry.priority} />
+                <LeadStatusBadge status={inquiry.lead_status} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <User className="h-3.5 w-3.5 text-primary" strokeWidth={1.75} />
+                  {contact?.email ?? '—'}
+                </span>
+                {contact?.company_name && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    {contact.company_name}
+                  </span>
+                )}
+                {contact?.phone && (
+                  <span className="inline-flex items-center gap-1.5 font-mono tabular-nums">
+                    <Phone className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    {contact.phone}
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1.5 font-mono tabular-nums">
+                  <Calendar className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  {formatDateTime(inquiry.created_at)}
+                </span>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight text-white">
-                {contact?.full_name ?? 'Unknown Contact'}
-              </h2>
-              <PriorityBadge priority={inquiry.priority} />
-              <LeadStatusBadge status={inquiry.lead_status} />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
-              <span className="inline-flex items-center gap-1.5 text-slate-200">
-                <User className="h-3.5 w-3.5 text-sky-400" />
-                {contact?.email ?? '—'}
-              </span>
-              {contact?.company_name && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Building2 className="h-3.5 w-3.5 text-slate-500" />
-                  {contact.company_name}
-                </span>
-              )}
-              {contact?.phone && (
-                <span className="inline-flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5 text-slate-500" />
-                  {contact.phone}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                {formatDateTime(inquiry.created_at)}
-              </span>
+              <ApprovalBadge status={inquiry.approval_status} />
+              <FollowupBadge status={inquiry.followup_status} />
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <ApprovalBadge status={inquiry.approval_status} />
-            <FollowupBadge status={inquiry.followup_status} />
-          </div>
-        </div>
+          <Separator className="my-4" />
 
-        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-800 pt-4 sm:grid-cols-4">
-          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-            <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              <DollarSign className="h-3 w-3" />
-              Budget
-            </span>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {formatBudgetRange(
-                inquiry.budget_min,
-                inquiry.budget_max,
-                inquiry.budget_currency,
-              )}
+          {/* 4 Key Commercial & Integration Specs */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-border/80 bg-muted/40 p-3">
+              <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <DollarSign className="h-3 w-3" strokeWidth={1.75} />
+                Budget
+              </span>
+              <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">
+                {formatBudgetRange(
+                  inquiry.budget_min,
+                  inquiry.budget_max,
+                  inquiry.budget_currency,
+                )}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border/80 bg-muted/40 p-3">
+              <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <Clock className="h-3 w-3" strokeWidth={1.75} />
+                Timeline
+              </span>
+              <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">
+                {inquiry.timeline_weeks
+                  ? `${inquiry.timeline_weeks} weeks`
+                  : 'Unspecified'}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border/80 bg-muted/40 p-3">
+              <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {inquiry.consent_to_email && !inquiry.unsubscribed_at ? (
+                  <MailCheck
+                    className="h-3 w-3 text-emerald-600"
+                    strokeWidth={1.75}
+                  />
+                ) : (
+                  <MailX
+                    className="h-3 w-3 text-rose-600"
+                    strokeWidth={1.75}
+                  />
+                )}
+                Email Consent
+              </span>
+              <p className="mt-1 text-sm font-semibold text-foreground">
+                {inquiry.unsubscribed_at
+                  ? 'Unsubscribed'
+                  : inquiry.consent_to_email
+                    ? 'Granted'
+                    : 'No Consent'}
+              </p>
+            </div>
+
+            <div className="rounded-lg border border-border/80 bg-muted/40 p-3">
+              <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <ExternalLink className="h-3 w-3" strokeWidth={1.75} />
+                HubSpot CRM
+              </span>
+              <p className="mt-1 truncate font-mono text-xs font-semibold text-foreground">
+                {contact?.hubspot_contact_id ?? 'Not synced'}
+              </p>
+            </div>
+          </div>
+
+          {/* Submitted Project Brief */}
+          <div className="mt-4 rounded-lg border border-border/80 bg-muted/30 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="font-semibold text-foreground">
+                Submitted Project Brief
+                {inquiry.service_type ? (
+                  <span className="font-normal text-muted-foreground">
+                    {' '}
+                    · {inquiry.service_type}
+                  </span>
+                ) : null}
+              </span>
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {inquiry.submission_id}
+              </span>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-secondary-foreground">
+              {inquiry.project_description}
             </p>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-            <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              <Clock className="h-3 w-3" />
-              Timeline
-            </span>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {inquiry.timeline_weeks ? `${inquiry.timeline_weeks} weeks` : 'Unspecified'}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-            <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              {inquiry.consent_to_email && !inquiry.unsubscribed_at ? (
-                <MailCheck className="h-3 w-3 text-emerald-400" />
-              ) : (
-                <MailX className="h-3 w-3 text-rose-400" />
-              )}
-              Email Consent
-            </span>
-            <p className="mt-1 text-sm font-semibold text-white">
-              {inquiry.unsubscribed_at
-                ? 'Unsubscribed'
-                : inquiry.consent_to_email
-                  ? 'Granted'
-                  : 'No Consent'}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
-            <span className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-              <ExternalLink className="h-3 w-3" />
-              HubSpot CRM
-            </span>
-            <p className="mt-1 truncate font-mono text-xs font-medium text-slate-200">
-              {contact?.hubspot_contact_id ?? 'Not synced'}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-slate-800/80 bg-slate-950/50 p-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-            <span className="font-medium text-slate-300">
-              Submitted Project Brief{' '}
-              {inquiry.service_type ? `· ${inquiry.service_type}` : ''}
-            </span>
-            <span className="font-mono text-[11px] text-slate-500">
-              {inquiry.submission_id}
-            </span>
-          </div>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
-            {inquiry.project_description}
-          </p>
-        </div>
-      </section>
-
-      {/* AI Qualification Summary + Score Breakdown */}
+      {/* AI Qualification Summary + Recharts Score Breakdown */}
       {latest_analysis ? (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Sparkles className="h-4 w-4 text-sky-400" />
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
+          <Card className="xl:col-span-5">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" strokeWidth={1.75} />
                 AI Qualification Summary
-              </h3>
-              <span className="rounded-full border border-slate-700 bg-slate-800/80 px-2.5 py-0.5 font-mono text-[11px] text-slate-300">
+              </CardTitle>
+              <Badge variant="neutral" className="font-mono text-[11px]">
                 {latest_analysis.model_name ?? 'AI'}
                 {latest_analysis.prompt_version
                   ? ` · ${latest_analysis.prompt_version}`
                   : ''}
-              </span>
-            </div>
+              </Badge>
+            </CardHeader>
 
-            <div className="mt-4 space-y-3.5 text-sm">
+            <Separator />
+
+            <CardContent className="space-y-4 pt-4 text-sm">
               <div>
-                <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Detected Service
                 </span>
-                <p className="mt-1 font-medium text-sky-300">
+                <p className="mt-1 font-medium text-primary">
                   {latest_analysis.detected_service ?? '—'}
                 </p>
               </div>
 
               <div>
-                <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Executive Summary
                 </span>
-                <p className="mt-1 leading-relaxed text-slate-200">
+                <p className="mt-1 leading-relaxed text-secondary-foreground">
                   {latest_analysis.project_summary ?? 'No summary available.'}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-3 text-xs">
-                <span className="rounded-lg border border-slate-800 bg-slate-950/70 px-2.5 py-1 text-slate-300">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary" className="font-normal">
                   Scope fit:{' '}
-                  <strong className="uppercase text-white">
+                  <strong className="ml-1 font-semibold uppercase text-foreground">
                     {latest_analysis.scope_fit ?? '—'}
                   </strong>
-                </span>
-                <span
-                  className={`rounded-lg border px-2.5 py-1 ${
-                    latest_analysis.spam_suspected
-                      ? 'border-rose-500/40 bg-rose-500/15 text-rose-200'
-                      : 'border-slate-800 bg-slate-950/70 text-slate-300'
-                  }`}
+                </Badge>
+                <Badge
+                  variant={latest_analysis.spam_suspected ? 'danger' : 'neutral'}
+                  className="font-normal"
                 >
                   Spam suspected:{' '}
-                  <strong>{latest_analysis.spam_suspected ? 'YES' : 'No'}</strong>
-                </span>
+                  <strong className="ml-1 font-semibold">
+                    {latest_analysis.spam_suspected ? 'YES' : 'No'}
+                  </strong>
+                </Badge>
               </div>
 
               <div>
-                <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Missing Information (
                   {Array.isArray(latest_analysis.missing_information)
                     ? latest_analysis.missing_information.length
@@ -263,33 +299,40 @@ export function InquiryDetailPanel({
                 </span>
                 {Array.isArray(latest_analysis.missing_information) &&
                 latest_analysis.missing_information.length > 0 ? (
-                  <ul className="mt-1.5 space-y-1.5">
+                  <ul className="mt-2 space-y-1.5">
                     {latest_analysis.missing_information.map((item, idx) => (
                       <li
                         key={`${idx}-${item}`}
-                        className="flex items-start gap-2 text-xs text-amber-200"
+                        className="flex items-start gap-2 rounded-md border border-warning-border bg-warning-soft px-2.5 py-1.5 text-xs text-warning"
                       >
-                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+                        <AlertTriangle
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0"
+                          strokeWidth={1.75}
+                        />
                         <span>{item}</span>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-300">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-success">
+                    <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.75} />
                     All key project details provided.
                   </p>
                 )}
               </div>
-            </div>
-          </section>
+            </CardContent>
+          </Card>
 
-          <ScoreBreakdownCard analysis={latest_analysis} />
+          <div className="xl:col-span-7">
+            <ScoreBreakdownCard analysis={latest_analysis} />
+          </div>
         </div>
       ) : (
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-sm text-slate-400">
-          AI qualification analysis has not been recorded for this inquiry yet.
-        </section>
+        <Card>
+          <CardContent className="py-6 text-sm text-muted-foreground">
+            AI qualification analysis has not been recorded for this inquiry yet.
+          </CardContent>
+        </Card>
       )}
 
       {/* Email Draft Approval Panel */}
@@ -303,135 +346,149 @@ export function InquiryDetailPanel({
       />
 
       {/* Manual Lifecycle Controls */}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-sm font-semibold text-white">
-              Manual Lifecycle &amp; Consent Controls
-            </h3>
-            <p className="mt-0.5 text-xs text-slate-400">
-              Updates inquiry state directly in Supabase and writes an audit event to{' '}
-              <span className="font-mono text-slate-300">activity_logs</span>.
-            </p>
-          </div>
-        </div>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Manual Lifecycle &amp; Consent Controls</CardTitle>
+          <CardDescription>
+            Updates inquiry state directly in Supabase and writes an audit event
+            to{' '}
+            <span className="font-mono text-foreground">activity_logs</span>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {(['replied', 'won', 'closed'] as const).map((targetStatus) => (
+              <Button
+                key={targetStatus}
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={
+                  statusLoading !== null || inquiry.lead_status === targetStatus
+                }
+                onClick={() =>
+                  handleStatusAction(
+                    targetStatus,
+                    { lead_status: targetStatus },
+                    `Lead status updated to '${targetStatus}'.`,
+                  )
+                }
+              >
+                {statusLoading === targetStatus && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                )}
+                Mark {targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1)}
+              </Button>
+            ))}
 
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          {(['replied', 'won', 'closed'] as const).map((targetStatus) => (
-            <button
-              key={targetStatus}
+            <Button
               type="button"
-              disabled={statusLoading !== null || inquiry.lead_status === targetStatus}
+              variant="outline"
+              size="sm"
+              disabled={statusLoading !== null || Boolean(inquiry.unsubscribed_at)}
               onClick={() =>
                 handleStatusAction(
-                  targetStatus,
-                  { lead_status: targetStatus },
-                  `Lead status updated to '${targetStatus}'.`,
+                  'unsubscribed',
+                  { unsubscribed: true },
+                  'Marked unsubscribed and stopped automated follow-ups.',
                 )
               }
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950/70 px-3.5 py-2 text-xs font-semibold text-slate-200 transition hover:border-sky-400 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              className="border-danger-border text-danger hover:bg-danger-soft hover:text-danger"
             >
-              {statusLoading === targetStatus && (
+              {statusLoading === 'unsubscribed' && (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               )}
-              Mark {targetStatus.charAt(0).toUpperCase() + targetStatus.slice(1)}
-            </button>
-          ))}
+              {inquiry.unsubscribed_at ? 'Unsubscribed' : 'Mark Unsubscribed'}
+            </Button>
+          </div>
 
-          <button
-            type="button"
-            disabled={statusLoading !== null || Boolean(inquiry.unsubscribed_at)}
-            onClick={() =>
-              handleStatusAction(
-                'unsubscribed',
-                { unsubscribed: true },
-                'Marked unsubscribed and stopped automated follow-ups.',
-              )
-            }
-            className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {statusLoading === 'unsubscribed' && (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            )}
-            {inquiry.unsubscribed_at ? 'Unsubscribed' : 'Mark Unsubscribed'}
-          </button>
-        </div>
-
-        {statusFeedback && (
-          <p
-            className={`mt-3 text-xs ${
-              statusFeedback.type === 'success'
-                ? 'text-emerald-300'
-                : 'text-rose-300'
-            }`}
-          >
-            {statusFeedback.message}
-          </p>
-        )}
-      </section>
+          {statusFeedback && (
+            <p
+              className={`mt-3 text-xs font-medium ${
+                statusFeedback.type === 'success'
+                  ? 'text-success'
+                  : 'text-danger'
+              }`}
+            >
+              {statusFeedback.message}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Inquiry-Scoped Workflow Errors */}
       {workflow_errors.length > 0 && (
-        <section className="rounded-2xl border border-rose-500/30 bg-rose-950/20 p-5">
-          <h3 className="flex items-center gap-2 text-sm font-semibold text-rose-200">
-            <AlertTriangle className="h-4 w-4 text-rose-400" />
-            Workflow Errors ({workflow_errors.length})
-          </h3>
-          <div className="mt-3 space-y-2.5">
+        <Card className="border-danger-border bg-danger-soft/40">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-danger">
+              <AlertTriangle className="h-4 w-4" strokeWidth={1.75} />
+              Workflow Errors ({workflow_errors.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2.5">
             {workflow_errors.map((err) => (
               <div
                 key={err.id}
-                className="rounded-xl border border-rose-500/20 bg-slate-950/70 p-3 text-xs"
+                className="rounded-lg border border-danger-border bg-card p-3 text-xs"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-semibold text-rose-200">
+                  <span className="font-semibold text-danger">
                     {err.workflow_name}
                     {err.node_name ? ` → ${err.node_name}` : ''}
                   </span>
-                  <span className="text-slate-400">
+                  <span className="font-mono tabular-nums text-muted-foreground">
                     {formatDateTime(err.created_at)}
                   </span>
                 </div>
-                <p className="mt-1 text-slate-300">{err.error_message}</p>
+                <p className="mt-1 text-secondary-foreground">
+                  {err.error_message}
+                </p>
               </div>
             ))}
-          </div>
-        </section>
+          </CardContent>
+        </Card>
       )}
 
       {/* Activity Logs Timeline */}
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-          <Activity className="h-4 w-4 text-sky-400" />
-          Activity Timeline ({activity_logs.length})
-        </h3>
-        {activity_logs.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-400">No activity events recorded yet.</p>
-        ) : (
-          <ol className="mt-3 space-y-2.5">
-            {activity_logs.map((log) => (
-              <li
-                key={log.id}
-                className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-xs"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-mono font-semibold text-sky-300">
-                    {log.event_type}
-                  </span>
-                  <span className="text-slate-500">
-                    {formatDateTime(log.created_at)}
-                  </span>
-                </div>
-                {log.event_data && Object.keys(log.event_data).length > 0 && (
-                  <pre className="mt-1.5 overflow-x-auto whitespace-pre-wrap font-mono text-[11px] text-slate-400">
-                    {JSON.stringify(log.event_data, null, 2)}
-                  </pre>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" strokeWidth={1.75} />
+            Activity Timeline ({activity_logs.length})
+          </CardTitle>
+        </CardHeader>
+        <Separator />
+        <CardContent className="pt-4">
+          {activity_logs.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No activity events recorded yet.
+            </p>
+          ) : (
+            <ol className="space-y-2.5">
+              {activity_logs.map((log) => (
+                <li
+                  key={log.id}
+                  className="rounded-lg border border-border/80 bg-muted/35 p-3 text-xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono font-semibold text-primary">
+                      {log.event_type}
+                    </span>
+                    <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                      {formatDateTime(log.created_at)}
+                    </span>
+                  </div>
+                  {log.event_data && Object.keys(log.event_data).length > 0 && (
+                    <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-md border border-border/70 bg-card p-2.5 font-mono text-[11px] text-secondary-foreground">
+                      {JSON.stringify(log.event_data, null, 2)}
+                    </pre>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

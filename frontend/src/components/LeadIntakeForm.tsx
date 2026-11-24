@@ -1,4 +1,3 @@
-import { useState, type FormEvent } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -7,12 +6,34 @@ import {
   RotateCcw,
   ShieldCheck,
 } from 'lucide-react';
-import { ApiRequestError, submitLead } from '../services/api';
+import { useState, type FormEvent } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { ApiRequestError, submitLead } from '@/services/api';
 import {
   VELOCE_SERVICES,
   type LeadAcceptedData,
   type LeadSubmissionInput,
-} from '../types/lead';
+} from '@/types/lead';
 
 interface FormState {
   full_name: string;
@@ -79,12 +100,14 @@ function validateClientForm(form: FormState): FieldErrors {
     !Number.isNaN(budgetMax) &&
     budgetMax < budgetMin
   ) {
-    errors.budget_max = 'Maximum budget must be greater than or equal to minimum budget.';
+    errors.budget_max =
+      'Maximum budget must be greater than or equal to minimum budget.';
   }
 
   const timeline = parseOptionalNumber(form.timeline_weeks);
   if (timeline !== null && (!Number.isInteger(timeline) || timeline <= 0)) {
-    errors.timeline_weeks = 'Timeline must be a whole number of weeks (at least 1).';
+    errors.timeline_weeks =
+      'Timeline must be a whole number of weeks (at least 1).';
   }
 
   if (form.project_description.trim().length < 10) {
@@ -100,9 +123,13 @@ export function LeadIntakeForm() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedResult, setSubmittedResult] = useState<LeadAcceptedData | null>(null);
+  const [submittedResult, setSubmittedResult] =
+    useState<LeadAcceptedData | null>(null);
 
-  const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+  const updateField = <K extends keyof FormState>(
+    key: K,
+    value: FormState[K],
+  ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (fieldErrors[key]) {
       setFieldErrors((prev) => {
@@ -157,6 +184,9 @@ export function LeadIntakeForm() {
     try {
       const result = await submitLead(payload);
       setSubmittedResult(result);
+      toast.success('Project inquiry received', {
+        description: `Reference ID: ${result.submission_id}`,
+      });
     } catch (err: unknown) {
       if (err instanceof ApiRequestError) {
         if (err.details.length > 0) {
@@ -169,8 +199,13 @@ export function LeadIntakeForm() {
           setFieldErrors(mappedErrors);
         }
         setBannerError(err.message);
+        toast.error('Submission could not be accepted', {
+          description: err.message,
+        });
       } else {
-        setBannerError('An unexpected error occurred. Please try again.');
+        const msg = 'An unexpected error occurred. Please try again.';
+        setBannerError(msg);
+        toast.error(msg);
       }
     } finally {
       setIsSubmitting(false);
@@ -179,331 +214,339 @@ export function LeadIntakeForm() {
 
   if (submittedResult) {
     return (
-      <div
-        className="rounded-2xl border border-emerald-500/30 bg-slate-900/90 p-8 shadow-2xl shadow-slate-950/50"
+      <Card
+        className="border-success-border"
         data-testid="lead-success-card"
       >
-        <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
-          <CheckCircle2 className="h-6 w-6" />
-        </div>
-        <h2 className="text-2xl font-semibold tracking-tight text-white">
-          Inquiry Received
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">
-          Thanks for reaching out to Veloce Digital. Your project brief has been queued for
-          qualification and technical review—a senior team member will review the tailored
-          response before anything is sent.
-        </p>
+        <CardContent className="p-6 sm:p-8">
+          <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-success-border bg-success-soft text-success">
+            <CheckCircle2 className="h-6 w-6" strokeWidth={1.75} />
+          </div>
 
-        <dl className="mt-6 space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4 text-sm">
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-400">Reference ID</dt>
-            <dd
-              className="font-mono text-xs font-medium text-sky-300"
-              data-testid="submission-id-value"
-            >
-              {submittedResult.submission_id}
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-400">Status</dt>
-            <dd className="inline-flex items-center rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-medium capitalize text-emerald-300">
-              {submittedResult.status}
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-4">
-            <dt className="text-slate-400">Received At</dt>
-            <dd className="text-xs text-slate-300">
-              {new Date(submittedResult.received_at).toLocaleString()}
-            </dd>
-          </div>
-        </dl>
+          <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+            Inquiry Received
+          </h2>
+          <p className="mt-2 text-sm leading-relaxed text-secondary-foreground">
+            Thanks for reaching out to Veloce Digital. Your project brief has
+            been queued for qualification and technical review — a senior team
+            member approves every tailored response before anything is sent.
+          </p>
 
-        <button
-          type="button"
-          onClick={handleReset}
-          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-400"
-        >
-          <RotateCcw className="h-4 w-4" />
-          Submit another inquiry
-        </button>
-      </div>
+          <dl className="mt-6 space-y-3 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-xs font-medium text-muted-foreground">
+                Reference ID
+              </dt>
+              <dd
+                className="truncate font-mono text-xs font-semibold text-primary"
+                data-testid="submission-id-value"
+              >
+                {submittedResult.submission_id}
+              </dd>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-xs font-medium text-muted-foreground">
+                Status
+              </dt>
+              <dd>
+                <Badge variant="success" className="capitalize">
+                  {submittedResult.status}
+                </Badge>
+              </dd>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-xs font-medium text-muted-foreground">
+                Received At
+              </dt>
+              <dd className="font-mono text-xs tabular-nums text-secondary-foreground">
+                {new Date(submittedResult.received_at).toLocaleString()}
+              </dd>
+            </div>
+          </dl>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={handleReset}
+            className="mt-6 w-full"
+          >
+            <RotateCcw className="h-4 w-4" strokeWidth={1.75} />
+            Submit another inquiry
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   const descriptionLength = form.project_description.trim().length;
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      noValidate
-      className="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-2xl shadow-slate-950/60 sm:p-8"
-    >
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold tracking-tight text-white">
-          Tell us about your project
-        </h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Fields marked with <span className="text-sky-400">*</span> are required.
-        </p>
-      </div>
+    <Card>
+      <CardHeader className="pb-4 sm:px-7 sm:pt-7">
+        <CardTitle className="text-lg">Tell us about your project</CardTitle>
+        <CardDescription>
+          Fields marked with <span className="font-semibold text-primary">*</span>{' '}
+          are required. Typical response within 1 business day.
+        </CardDescription>
+      </CardHeader>
 
-      {bannerError && (
-        <div
-          role="alert"
-          className="mb-6 flex items-start gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-sm text-rose-200"
-        >
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
-          <span>{bannerError}</span>
-        </div>
-      )}
+      <Separator />
 
-      <div className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="full_name" className="mb-1.5 block text-sm font-medium text-slate-200">
-              Full Name <span className="text-sky-400">*</span>
-            </label>
-            <input
-              id="full_name"
-              name="full_name"
-              type="text"
-              autoComplete="name"
-              placeholder="Sarah Chen"
-              value={form.full_name}
-              onChange={(e) => updateField('full_name', e.target.value)}
-              className={`w-full rounded-xl border bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 ${
-                fieldErrors.full_name ? 'border-rose-500' : 'border-slate-700'
-              }`}
-            />
-            {fieldErrors.full_name && (
-              <p className="mt-1 text-xs text-rose-400">{fieldErrors.full_name}</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-200">
-              Work Email <span className="text-sky-400">*</span>
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="sarah@acmesaas.io"
-              value={form.email}
-              onChange={(e) => updateField('email', e.target.value)}
-              className={`w-full rounded-xl border bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 ${
-                fieldErrors.email ? 'border-rose-500' : 'border-slate-700'
-              }`}
-            />
-            {fieldErrors.email && (
-              <p className="mt-1 text-xs text-rose-400">{fieldErrors.email}</p>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="company_name"
-              className="mb-1.5 block text-sm font-medium text-slate-200"
+      <CardContent className="pt-6 sm:px-7 sm:pb-7">
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {bannerError && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-lg border border-danger-border bg-danger-soft p-3.5 text-sm text-danger"
             >
-              Company Name
-            </label>
-            <input
-              id="company_name"
-              name="company_name"
-              type="text"
-              autoComplete="organization"
-              placeholder="Acme SaaS Inc."
-              value={form.company_name}
-              onChange={(e) => updateField('company_name', e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60"
-            />
+              <AlertCircle
+                className="mt-0.5 h-4 w-4 shrink-0"
+                strokeWidth={1.75}
+              />
+              <span>{bannerError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="full_name">
+                Full Name <span className="text-primary">*</span>
+              </Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                type="text"
+                autoComplete="name"
+                placeholder="Sarah Chen"
+                value={form.full_name}
+                onChange={(e) => updateField('full_name', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.full_name)}
+                className={fieldErrors.full_name ? 'border-destructive' : ''}
+              />
+              {fieldErrors.full_name && (
+                <p className="text-xs text-danger">{fieldErrors.full_name}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="email">
+                Work Email <span className="text-primary">*</span>
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="sarah@acmesaas.io"
+                value={form.email}
+                onChange={(e) => updateField('email', e.target.value)}
+                aria-invalid={Boolean(fieldErrors.email)}
+                className={fieldErrors.email ? 'border-destructive' : ''}
+              />
+              {fieldErrors.email && (
+                <p className="text-xs text-danger">{fieldErrors.email}</p>
+              )}
+            </div>
           </div>
 
-          <div>
-            <label htmlFor="phone" className="mb-1.5 block text-sm font-medium text-slate-200">
-              Phone <span className="text-xs font-normal text-slate-500">(optional)</span>
-            </label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              autoComplete="tel"
-              placeholder="+1-415-555-0192"
-              value={form.phone}
-              onChange={(e) => updateField('phone', e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60"
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="company_name">Company Name</Label>
+              <Input
+                id="company_name"
+                name="company_name"
+                type="text"
+                autoComplete="organization"
+                placeholder="Acme SaaS Inc."
+                value={form.company_name}
+                onChange={(e) => updateField('company_name', e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="phone">
+                Phone{' '}
+                <span className="font-normal text-muted-foreground">
+                  (optional)
+                </span>
+              </Label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+1-415-555-0192"
+                value={form.phone}
+                onChange={(e) => updateField('phone', e.target.value)}
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label
-            htmlFor="service_type"
-            className="mb-1.5 block text-sm font-medium text-slate-200"
-          >
-            Primary Service Needed
-          </label>
-          <select
-            id="service_type"
-            name="service_type"
-            value={form.service_type}
-            onChange={(e) => updateField('service_type', e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500/60"
-          >
-            <option value="">Select a service (optional)</option>
-            {VELOCE_SERVICES.map((service) => (
-              <option key={service} value={service}>
-                {service}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="service_type">Primary Service Needed</Label>
+            <Select
+              value={form.service_type || '__none__'}
+              onValueChange={(value) =>
+                updateField('service_type', value === '__none__' ? '' : value)
+              }
+            >
+              <SelectTrigger id="service_type">
+                <SelectValue placeholder="Select a service (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">
+                  Select a service (optional)
+                </SelectItem>
+                {VELOCE_SERVICES.map((service) => (
+                  <SelectItem key={service} value={service}>
+                    {service}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label htmlFor="budget_min" className="mb-1.5 block text-sm font-medium text-slate-200">
-              Budget Min (USD)
-            </label>
-            <input
-              id="budget_min"
-              name="budget_min"
-              type="number"
-              min={0}
-              step={500}
-              placeholder="5000"
-              value={form.budget_min}
-              onChange={(e) => updateField('budget_min', e.target.value)}
-              className={`w-full rounded-xl border bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 ${
-                fieldErrors.budget_min ? 'border-rose-500' : 'border-slate-700'
-              }`}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="budget_min">Budget Min (USD)</Label>
+              <Input
+                id="budget_min"
+                name="budget_min"
+                type="number"
+                min={0}
+                step={500}
+                placeholder="5000"
+                value={form.budget_min}
+                onChange={(e) => updateField('budget_min', e.target.value)}
+                className={`font-mono tabular-nums ${fieldErrors.budget_min ? 'border-destructive' : ''}`}
+              />
+              {fieldErrors.budget_min && (
+                <p className="text-xs text-danger">{fieldErrors.budget_min}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="budget_max">Budget Max (USD)</Label>
+              <Input
+                id="budget_max"
+                name="budget_max"
+                type="number"
+                min={0}
+                step={500}
+                placeholder="15000"
+                value={form.budget_max}
+                onChange={(e) => updateField('budget_max', e.target.value)}
+                className={`font-mono tabular-nums ${fieldErrors.budget_max ? 'border-destructive' : ''}`}
+              />
+              {fieldErrors.budget_max && (
+                <p className="text-xs text-danger">{fieldErrors.budget_max}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="timeline_weeks">Timeline (Weeks)</Label>
+              <Input
+                id="timeline_weeks"
+                name="timeline_weeks"
+                type="number"
+                min={1}
+                step={1}
+                placeholder="8"
+                value={form.timeline_weeks}
+                onChange={(e) => updateField('timeline_weeks', e.target.value)}
+                className={`font-mono tabular-nums ${fieldErrors.timeline_weeks ? 'border-destructive' : ''}`}
+              />
+              {fieldErrors.timeline_weeks && (
+                <p className="text-xs text-danger">
+                  {fieldErrors.timeline_weeks}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="project_description">
+                Project Goals &amp; Scope <span className="text-primary">*</span>
+              </Label>
+              <span
+                className={`font-mono text-[11px] tabular-nums ${
+                  descriptionLength >= 10
+                    ? 'text-muted-foreground'
+                    : 'text-warning'
+                }`}
+              >
+                {descriptionLength} chars (min 10)
+              </span>
+            </div>
+            <Textarea
+              id="project_description"
+              name="project_description"
+              rows={4}
+              placeholder="Share your core features, target launch window, existing designs/PRD, and any integrations (Stripe, HubSpot, APIs)..."
+              value={form.project_description}
+              onChange={(e) =>
+                updateField('project_description', e.target.value)
+              }
+              aria-invalid={Boolean(fieldErrors.project_description)}
+              className={
+                fieldErrors.project_description ? 'border-destructive' : ''
+              }
             />
-            {fieldErrors.budget_min && (
-              <p className="mt-1 text-xs text-rose-400">{fieldErrors.budget_min}</p>
+            {fieldErrors.project_description && (
+              <p className="text-xs text-danger">
+                {fieldErrors.project_description}
+              </p>
             )}
           </div>
 
-          <div>
-            <label htmlFor="budget_max" className="mb-1.5 block text-sm font-medium text-slate-200">
-              Budget Max (USD)
-            </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/40 p-3.5 transition-colors hover:bg-muted/70">
             <input
-              id="budget_max"
-              name="budget_max"
-              type="number"
-              min={0}
-              step={500}
-              placeholder="15000"
-              value={form.budget_max}
-              onChange={(e) => updateField('budget_max', e.target.value)}
-              className={`w-full rounded-xl border bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 ${
-                fieldErrors.budget_max ? 'border-rose-500' : 'border-slate-700'
-              }`}
+              id="consent_to_email"
+              name="consent_to_email"
+              type="checkbox"
+              checked={form.consent_to_email}
+              onChange={(e) =>
+                updateField('consent_to_email', e.target.checked)
+              }
+              className="mt-0.5 h-4 w-4 rounded border-input accent-primary focus:ring-2 focus:ring-ring"
             />
-            {fieldErrors.budget_max && (
-              <p className="mt-1 text-xs text-rose-400">{fieldErrors.budget_max}</p>
-            )}
-          </div>
-
-          <div>
-            <label
-              htmlFor="timeline_weeks"
-              className="mb-1.5 block text-sm font-medium text-slate-200"
-            >
-              Timeline (Weeks)
-            </label>
-            <input
-              id="timeline_weeks"
-              name="timeline_weeks"
-              type="number"
-              min={1}
-              step={1}
-              placeholder="8"
-              value={form.timeline_weeks}
-              onChange={(e) => updateField('timeline_weeks', e.target.value)}
-              className={`w-full rounded-xl border bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 ${
-                fieldErrors.timeline_weeks ? 'border-rose-500' : 'border-slate-700'
-              }`}
-            />
-            {fieldErrors.timeline_weeks && (
-              <p className="mt-1 text-xs text-rose-400">{fieldErrors.timeline_weeks}</p>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <label
-              htmlFor="project_description"
-              className="block text-sm font-medium text-slate-200"
-            >
-              Project Goals & Scope <span className="text-sky-400">*</span>
-            </label>
-            <span
-              className={`text-xs ${
-                descriptionLength >= 10 ? 'text-slate-400' : 'text-amber-400'
-              }`}
-            >
-              {descriptionLength} chars (min 10)
+            <span className="text-xs leading-relaxed text-secondary-foreground">
+              I consent to Veloce Digital contacting me by email regarding this
+              project inquiry and a single follow-up if we have not connected
+              within 24 hours.
             </span>
-          </div>
-          <textarea
-            id="project_description"
-            name="project_description"
-            rows={4}
-            placeholder="Share your core features, target launch window, existing designs/PRD, and any integrations (Stripe, HubSpot, APIs)..."
-            value={form.project_description}
-            onChange={(e) => updateField('project_description', e.target.value)}
-            className={`w-full resize-y rounded-xl border bg-slate-950 px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 ${
-              fieldErrors.project_description ? 'border-rose-500' : 'border-slate-700'
-            }`}
-          />
-          {fieldErrors.project_description && (
-            <p className="mt-1 text-xs text-rose-400">{fieldErrors.project_description}</p>
-          )}
-        </div>
+          </label>
 
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3.5">
-          <input
-            id="consent_to_email"
-            name="consent_to_email"
-            type="checkbox"
-            checked={form.consent_to_email}
-            onChange={(e) => updateField('consent_to_email', e.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-500 focus:ring-sky-500"
-          />
-          <span className="text-xs leading-relaxed text-slate-300">
-            I consent to Veloce Digital contacting me by email regarding this project inquiry and
-            a single follow-up if we have not connected within 24 hours.
-          </span>
-        </label>
+          <Button
+            type="submit"
+            size="lg"
+            disabled={isSubmitting}
+            className="w-full"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Submitting inquiry...
+              </>
+            ) : (
+              <>
+                Submit Project Inquiry
+                <ArrowRight className="h-4 w-4" strokeWidth={1.75} />
+              </>
+            )}
+          </Button>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Submitting inquiry...
-            </>
-          ) : (
-            <>
-              Submit Project Inquiry
-              <ArrowRight className="h-4 w-4" />
-            </>
-          )}
-        </button>
-
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
-          <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
-          Human-in-the-Loop review: every response is approved by a Veloce engineer before sending.
-        </p>
-      </div>
-    </form>
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" strokeWidth={1.75} />
+            Human-in-the-Loop review: every response is approved by a Veloce
+            engineer before sending.
+          </p>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
