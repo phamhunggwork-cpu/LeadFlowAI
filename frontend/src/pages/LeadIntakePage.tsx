@@ -1,4 +1,5 @@
-import { Check, Clock, Layers, Sparkles } from 'lucide-react';
+import { Check, Clock, Layers, ShieldCheck, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { LeadIntakeForm } from '../components/LeadIntakeForm';
 
 const CORE_CAPABILITIES = [
@@ -27,10 +28,19 @@ export function LeadIntakePage() {
             </div>
           </div>
 
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Powered by LeadFlow AI
-          </span>
+          <div className="flex items-center gap-2.5">
+            <span className="hidden items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-xs font-medium text-slate-300 sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Powered by LeadFlow AI
+            </span>
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300 transition hover:bg-sky-500/20"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Review Dashboard
+            </Link>
+          </div>
         </div>
       </header>
 
