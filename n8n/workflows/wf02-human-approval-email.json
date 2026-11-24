@@ -1,0 +1,1332 @@
+{
+  "name": "WF02 - Human Approval & Email Sending",
+  "description": "Processes human approve/reject decisions from the dashboard, enforces strict pending-state and idempotency guards, sends approved initial emails via Resend with Idempotency-Key, and updates Supabase records.",
+  "nodes": [
+    {
+      "id": "d1f2244d-b109-48d5-9898-3d5df9f16377",
+      "name": "Receive Approval Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        192
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-approval",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "44e65c50-c5d7-485e-bdc7-b8af692242c3",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "x-webhook-secret"
+        }
+      }
+    },
+    {
+      "id": "dcd1c0e5-6518-40c2-9c5f-b91fa8003c59",
+      "name": "Validate Approval Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        272,
+        320
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "approval-validation-result",
+              "name": "result",
+              "type": "object",
+              "value": "={{ (() => {\n  const rawBody = $('Receive Approval Webhook').item.json.body;\n  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\n  const REQUIRED_SCHEMA = {\n    type: 'object',\n    required: ['inquiry_id', 'email_message_id', 'action', 'approved_by'],\n    properties: {\n      inquiry_id: { type: 'string', format: 'uuid' },\n      email_message_id: { type: 'string', format: 'uuid' },\n      action: { type: 'string', enum: ['approve', 'reject'] },\n      approved_by: { type: 'string', format: 'uuid' },\n      subject: { type: ['string', 'null'], maxLength: 250 },\n      body: { type: ['string', 'null'], maxLength: 10000 },\n      rejection_reason: { type: ['string', 'null'], maxLength: 1000 }\n    }\n  };\n  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {\n    return {\n      valid: false,\n      validationError: 'Request body must be a JSON object',\n      details: [{ field: 'body', message: 'Request body must be a JSON object' }],\n      requiredSchema: REQUIRED_SCHEMA,\n      normalized: null\n    };\n  }\n  const errors = [];\n  const addError = (field, message) => errors.push({ field, message });\n  const trimOrNull = (val) => {\n    if (typeof val !== 'string') return null;\n    const t = val.trim();\n    return t.length > 0 ? t : null;\n  };\n  const inquiryId = trimOrNull(rawBody.inquiry_id);\n  if (!inquiryId || !UUID_REGEX.test(inquiryId)) addError('inquiry_id', 'inquiry_id must be a valid UUID');\n  const emailMessageId = trimOrNull(rawBody.email_message_id);\n  if (!emailMessageId || !UUID_REGEX.test(emailMessageId)) addError('email_message_id', 'email_message_id must be a valid UUID');\n  const action = trimOrNull(rawBody.action);\n  if (action !== 'approve' && action !== 'reject') addError('action', 'action must be approve or reject');\n  const approvedBy = trimOrNull(rawBody.approved_by);\n  if (!approvedBy || !UUID_REGEX.test(approvedBy)) addError('approved_by', 'approved_by must be a valid UUID');\n  let subject = null;\n  if (rawBody.subject !== undefined && rawBody.subject !== null) {\n    if (typeof rawBody.subject !== 'string') addError('subject', 'subject must be a string');\n    else {\n      const t = rawBody.subject.trim();\n      if (t.length > 250) addError('subject', 'subject must be at most 250 characters');\n      else if (t.length > 0) subject = t;\n    }\n  }\n  let bodyText = null;\n  if (rawBody.body !== undefined && rawBody.body !== null) {\n    if (typeof rawBody.body !== 'string') addError('body', 'body must be a string');\n    else {\n      const t = rawBody.body.trim();\n      if (t.length > 10000) addError('body', 'body must be at most 10000 characters');\n      else if (t.length > 0) bodyText = t;\n    }\n  }\n  let rejectionReason = null;\n  if (rawBody.rejection_reason !== undefined && rawBody.rejection_reason !== null) {\n    if (typeof rawBody.rejection_reason !== 'string') addError('rejection_reason', 'rejection_reason must be a string');\n    else {\n      const t = rawBody.rejection_reason.trim();\n      if (t.length > 1000) addError('rejection_reason', 'rejection_reason must be at most 1000 characters');\n      else if (t.length > 0) rejectionReason = t;\n    }\n  }\n  if (errors.length > 0) {\n    return {\n      valid: false,\n      validationError: errors[0].message,\n      details: errors,\n      requiredSchema: REQUIRED_SCHEMA,\n      normalized: null\n    };\n  }\n  return {\n    valid: true,\n    validationError: null,\n    details: [],\n    requiredSchema: null,\n    normalized: {\n      inquiry_id: inquiryId,\n      email_message_id: emailMessageId,\n      action,\n      approved_by: approvedBy,\n      subject,\n      body: bodyText,\n      rejection_reason: rejectionReason,\n      expected_idempotency_key: 'email:' + inquiryId + ':initial',\n      received_at: DateTime.now().toUTC().toISO()\n    }\n  };\n})() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Defense-in-depth WF02 request validator matching 03-api-and-rls-contract.md."
+    },
+    {
+      "id": "41af7f2d-731d-43fb-8776-60a922b86646",
+      "name": "If Payload Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        496,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "approval-payload-valid",
+              "leftValue": "={{ $('Validate Approval Payload').item.json.result.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "246771cc-a3e3-49c4-9f68-6ce16e976260",
+      "name": "Fetch Inquiry Record",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        800,
+        448
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "inquiries",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Loads target inquiry to verify approval_status, consent_to_email, and unsubscribed_at.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "21a360d8-7ba8-494d-acbf-8359011b9991",
+      "name": "Fetch Email Draft",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        368
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "email_messages",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.email_message_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Loads target operational draft from email_messages to verify pending_approval status and idempotency_key.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "2ec45b4b-c824-4255-8c88-11fec4c5619f",
+      "name": "Evaluate Approval Guards",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1248,
+        320
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "approval-guard-result",
+              "name": "guard",
+              "type": "object",
+              "value": "={{ (() => {\n  const req = $('Validate Approval Payload').item.json.result.normalized;\n  const inquiry = $('Fetch Inquiry Record').item.json || {};\n  const email = $('Fetch Email Draft').item.json || {};\n  const fail = (httpStatus, errorCode, message) => ({\n    allowed: false,\n    httpStatus,\n    errorCode,\n    message,\n    action: req.action,\n    currentApprovalStatus: inquiry.approval_status ?? null,\n    currentEmailStatus: email.status ?? null\n  });\n  if (!inquiry.id) return fail(404, 'NOT_FOUND', 'Inquiry not found');\n  if (!email.id) return fail(404, 'NOT_FOUND', 'Operational email draft not found');\n  if (email.inquiry_id !== inquiry.id) return fail(409, 'CONFLICT', 'Email draft does not belong to the specified inquiry');\n  if (email.message_type !== 'initial' || email.direction !== 'outbound') return fail(409, 'CONFLICT', 'Only outbound initial email drafts can be processed by WF02');\n  if (email.idempotency_key !== req.expected_idempotency_key) return fail(409, 'CONFLICT', 'Email draft idempotency_key does not match expected initial email key');\n  if (email.status === 'sent' || email.provider_message_id) return fail(409, 'CONFLICT', 'Initial email has already been sent for this inquiry');\n  if (inquiry.approval_status !== 'pending') return fail(409, 'CONFLICT', 'Inquiry cannot be processed while approval_status is ' + inquiry.approval_status);\n  if (email.status !== 'pending_approval') return fail(409, 'CONFLICT', 'Email draft cannot be processed while status is ' + email.status);\n  if (req.action === 'approve' && Boolean(inquiry.unsubscribed_at)) return fail(409, 'CONFLICT', 'Cannot send outbound email to an unsubscribed inquiry');\n  const finalSubject = req.subject || (typeof email.subject === 'string' && email.subject.trim() ? email.subject.trim() : 'Following up on your project inquiry with Veloce Digital');\n  const finalBody = req.body || (typeof email.body === 'string' ? email.body.trim() : '');\n  if (req.action === 'approve' && !finalBody) return fail(400, 'VALIDATION_ERROR', 'Email body cannot be empty');\n  const recipientEmail = typeof email.recipient_email === 'string' ? email.recipient_email.trim().toLowerCase() : '';\n  if (req.action === 'approve' && !recipientEmail) return fail(400, 'VALIDATION_ERROR', 'Recipient email address is missing on draft');\n  const nextFollowupStatus = inquiry.consent_to_email === true && !inquiry.unsubscribed_at ? 'scheduled' : 'not_eligible';\n  return {\n    allowed: true,\n    httpStatus: 200,\n    errorCode: null,\n    message: null,\n    action: req.action,\n    finalSubject,\n    finalBody,\n    recipientEmail,\n    idempotencyKey: email.idempotency_key,\n    nextFollowupStatus,\n    actionTimestamp: DateTime.now().toUTC().toISO(),\n    currentApprovalStatus: inquiry.approval_status,\n    currentEmailStatus: email.status\n  };\n})() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "Enforces strict HITL pending state, ownership, idempotency_key invariant, and unsubscribe protection before side effects."
+    },
+    {
+      "id": "2d1d89f1-2c50-4c06-92ed-c89f46146fda",
+      "name": "If Guard Passed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1472,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "guard-allowed",
+              "leftValue": "={{ $('Evaluate Approval Guards').item.json.guard.allowed }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "6da4432f-a48f-46ae-9729-32951bc483e2",
+      "name": "If Action Is Approve",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1696,
+        224
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "action-is-approve",
+              "leftValue": "={{ $('Evaluate Approval Guards').item.json.guard.action }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "approve"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "bfa36a6c-55f9-4866-9aee-cb17624348be",
+      "name": "Queue Approved Email Draft",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        512
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "email_messages",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.email_message_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "queued"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Evaluate Approval Guards').item.json.guard.finalSubject }}"
+            },
+            {
+              "fieldId": "body",
+              "fieldValue": "={{ $('Evaluate Approval Guards').item.json.guard.finalBody }}"
+            },
+            {
+              "fieldId": "approved_by",
+              "fieldValue": "={{ $('Validate Approval Payload').item.json.result.normalized.approved_by }}"
+            },
+            {
+              "fieldId": "approved_at",
+              "fieldValue": "={{ $('Evaluate Approval Guards').item.json.guard.actionTimestamp }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Marks draft queued with approved_by, approved_at, and edited subject/body before calling Resend to prevent concurrent duplicate dispatch.",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "688e283d-4ff1-4c84-a635-75cf8f60ec97",
+      "name": "Send Initial Email via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1552,
+        448
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('Evaluate Approval Guards').item.json.guard.idempotencyKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: \"Veloce Digital <onboarding@resend.dev>\", to: [$(\"Evaluate Approval Guards\").item.json.guard.recipientEmail], subject: $(\"Evaluate Approval Guards\").item.json.guard.finalSubject, text: $(\"Evaluate Approval Guards\").item.json.guard.finalBody } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_RESEND_CREDENTIAL_ID",
+          "name": "Resend LeadFlow"
+        }
+      },
+      "notes": "Dispatches approved initial email via Resend REST API with Idempotency-Key header (email:<inquiry_id>:initial) for 24h provider-side deduplication.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "94df48d1-88c2-49c7-855a-680540ca95ab",
+      "name": "Mark Email Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        224
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "email_messages",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.email_message_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "sent"
+            },
+            {
+              "fieldId": "provider_message_id",
+              "fieldValue": "={{ $('Send Initial Email via Resend').item.json.id ?? null }}"
+            },
+            {
+              "fieldId": "sent_at",
+              "fieldValue": "={{ DateTime.now().toUTC().toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8a2acee9-3289-4d09-85b5-386b19b0a8ae",
+      "name": "Update Inquiry Contacted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        224
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "inquiries",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "lead_status",
+              "fieldValue": "contacted"
+            },
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "approved"
+            },
+            {
+              "fieldId": "followup_status",
+              "fieldValue": "={{ $('Evaluate Approval Guards').item.json.guard.nextFollowupStatus }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "dbd27c11-af3e-4e6a-a64b-9c59045502c5",
+      "name": "Log Initial Email Sent",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        176
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "activity_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "initial_email_sent"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, idempotency_key: $(\"Evaluate Approval Guards\").item.json.guard.idempotencyKey, provider: \"resend\", provider_message_id: $(\"Send Initial Email via Resend\").item.json.id ?? null, approved_by: $(\"Validate Approval Payload\").item.json.result.normalized.approved_by, recipient_email: $(\"Evaluate Approval Guards\").item.json.guard.recipientEmail, subject: $(\"Evaluate Approval Guards\").item.json.guard.finalSubject, followup_status: $(\"Evaluate Approval Guards\").item.json.guard.nextFollowupStatus } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "544c058f-94ac-43e2-8789-52dc77619a4c",
+      "name": "Respond Email Sent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2448,
+        128
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, status: \"sent\", workflow: \"wf02-human-approval-email\", inquiry_id: $(\"Validate Approval Payload\").item.json.result.normalized.inquiry_id, email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, action: \"approve\", email_status: \"sent\", provider_message_id: $(\"Send Initial Email via Resend\").item.json.id ?? null, followup_status: $(\"Evaluate Approval Guards\").item.json.guard.nextFollowupStatus, received_at: $(\"Validate Approval Payload\").item.json.result.normalized.received_at } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "a5403969-2ee8-4361-a082-be5b5f262b9f",
+      "name": "Return Approve DB Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2448,
+        416
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"INTERNAL_ERROR\", message: String($json.error?.message || $json.message || \"Database error while finalizing approved email\").slice(0, 300) } } }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "7245e417-ae62-4f3d-8d0f-b2733b60ea1e",
+      "name": "Mark Email Failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        704
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "email_messages",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.email_message_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "750b5864-e1e4-4f50-9d76-af4ec716a64d",
+      "name": "Return Upstream Email Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2448,
+        784
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"UPSTREAM_ERROR\", message: \"Failed to send initial email via Resend\" }, inquiry_id: $(\"Validate Approval Payload\").item.json.result.normalized.inquiry_id, email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, email_status: \"failed\" } }}",
+        "options": {
+          "responseCode": 502
+        }
+      }
+    },
+    {
+      "id": "cae12aa9-bba5-41dd-80d8-658bbf72bd54",
+      "name": "Record Email Send Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        688
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "workflow_errors",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Fetch Inquiry Record').item.json.submission_id ?? null }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "WF02 - Human Approval & Email Sending"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "Send Initial Email via Resend"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ String($('Send Initial Email via Resend').item.json.error?.message || $('Send Initial Email via Resend').item.json.error?.description || $('Send Initial Email via Resend').item.json.message || 'Resend API request failed').slice(0, 1000) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "34599d11-13fd-44a4-ad09-ba686387a51a",
+      "name": "Log Initial Email Failed",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        608
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "activity_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "initial_email_failed"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, idempotency_key: $(\"Evaluate Approval Guards\").item.json.guard.idempotencyKey, approved_by: $(\"Validate Approval Payload\").item.json.result.normalized.approved_by, provider: \"resend\", error_message: String($(\"Send Initial Email via Resend\").item.json.error?.message || $(\"Send Initial Email via Resend\").item.json.error?.description || $(\"Send Initial Email via Resend\").item.json.message || \"Resend API request failed\").slice(0, 500) } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "f09d68b0-6cc6-43d8-ad90-d6a41d2ca988",
+      "name": "Cancel Email Draft",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        512
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "email_messages",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.email_message_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "cancelled"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "160cce74-511b-48ce-a74a-431a66a8b491",
+      "name": "Update Inquiry Rejected",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1552,
+        448
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "inquiries",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "approval_status",
+              "fieldValue": "rejected"
+            },
+            {
+              "fieldId": "lead_status",
+              "fieldValue": "closed"
+            },
+            {
+              "fieldId": "followup_status",
+              "fieldValue": "not_eligible"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "50e66616-2a9a-4f65-99ba-29d009f7ef62",
+      "name": "Log Initial Email Rejected",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        368
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "activity_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Validate Approval Payload').item.json.result.normalized.inquiry_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "initial_email_rejected"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, rejected_by: $(\"Validate Approval Payload\").item.json.result.normalized.approved_by, rejection_reason: $(\"Validate Approval Payload\").item.json.result.normalized.rejection_reason ?? null } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "49219bdb-31fd-4f21-ae58-96bf72c994c8",
+      "name": "Respond Draft Rejected",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2000,
+        320
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, status: \"rejected\", workflow: \"wf02-human-approval-email\", inquiry_id: $(\"Validate Approval Payload\").item.json.result.normalized.inquiry_id, email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, action: \"reject\", email_status: \"cancelled\", received_at: $(\"Validate Approval Payload\").item.json.result.normalized.received_at } }}",
+        "options": {
+          "responseCode": 200
+        }
+      }
+    },
+    {
+      "id": "20c941e1-3343-411a-9b0b-dfc6483c95e7",
+      "name": "Return Reject DB Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2000,
+        560
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"INTERNAL_ERROR\", message: String($json.error?.message || $json.message || \"Database error while rejecting email draft\").slice(0, 300) } } }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "a988516c-2f8d-4daf-8587-917f45bcd7ff",
+      "name": "Return Guard Conflict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1696,
+        416
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: $(\"Evaluate Approval Guards\").item.json.guard.errorCode, message: $(\"Evaluate Approval Guards\").item.json.guard.message }, inquiry_id: $(\"Validate Approval Payload\").item.json.result.normalized.inquiry_id, email_message_id: $(\"Validate Approval Payload\").item.json.result.normalized.email_message_id, current_approval_status: $(\"Evaluate Approval Guards\").item.json.guard.currentApprovalStatus, current_email_status: $(\"Evaluate Approval Guards\").item.json.guard.currentEmailStatus } }}",
+        "options": {
+          "responseCode": "={{ $('Evaluate Approval Guards').item.json.guard.httpStatus }}"
+        }
+      }
+    },
+    {
+      "id": "b5611a7c-09f8-4b50-bbfe-8770084973bf",
+      "name": "Return Lookup Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1248,
+        544
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"INTERNAL_ERROR\", message: String($json.error?.message || $json.message || \"Database lookup failed during approval guard check\").slice(0, 300) } } }}",
+        "options": {
+          "responseCode": 500
+        }
+      }
+    },
+    {
+      "id": "9d03f784-deaa-4bb8-b1bd-c0fc63427a7f",
+      "name": "Return Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        912,
+        288
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, data: null, error: { code: \"VALIDATION_ERROR\", message: $(\"Validate Approval Payload\").item.json.result.validationError, details: $(\"Validate Approval Payload\").item.json.result.details }, request_schema: $(\"Validate Approval Payload\").item.json.result.requiredSchema } }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Approval Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Approval Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Approval Payload": {
+      "main": [
+        [
+          {
+            "node": "If Payload Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Payload Valid": {
+      "main": [
+        [
+          {
+            "node": "Fetch Inquiry Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Inquiry Record": {
+      "main": [
+        [
+          {
+            "node": "Fetch Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Lookup Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Email Draft": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Approval Guards",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Lookup Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Approval Guards": {
+      "main": [
+        [
+          {
+            "node": "If Guard Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Guard Passed": {
+      "main": [
+        [
+          {
+            "node": "If Action Is Approve",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Guard Conflict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Action Is Approve": {
+      "main": [
+        [
+          {
+            "node": "Queue Approved Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancel Email Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Approved Email Draft": {
+      "main": [
+        [
+          {
+            "node": "Send Initial Email via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Approve DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Initial Email via Resend": {
+      "main": [
+        [
+          {
+            "node": "Mark Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Email Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Update Inquiry Contacted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Approve DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Inquiry Contacted": {
+      "main": [
+        [
+          {
+            "node": "Log Initial Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Approve DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Initial Email Sent": {
+      "main": [
+        [
+          {
+            "node": "Respond Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Approve DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Email Failed": {
+      "main": [
+        [
+          {
+            "node": "Record Email Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Upstream Email Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Email Send Error": {
+      "main": [
+        [
+          {
+            "node": "Log Initial Email Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Upstream Email Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Initial Email Failed": {
+      "main": [
+        [
+          {
+            "node": "Return Upstream Email Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Upstream Email Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel Email Draft": {
+      "main": [
+        [
+          {
+            "node": "Update Inquiry Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Reject DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Inquiry Rejected": {
+      "main": [
+        [
+          {
+            "node": "Log Initial Email Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Reject DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Initial Email Rejected": {
+      "main": [
+        [
+          {
+            "node": "Respond Draft Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Reject DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "nodeGroups": [
+    {
+      "id": "94ccd809-775d-4d1b-9241-dc9de018b808",
+      "name": "Validate Payload",
+      "nodeIds": [
+        "dcd1c0e5-6518-40c2-9c5f-b91fa8003c59",
+        "41af7f2d-731d-43fb-8776-60a922b86646"
+      ],
+      "description": "Validates approval payload UUIDs, action enum, and optional edits before any Supabase query."
+    },
+    {
+      "id": "3769ce90-e259-474e-aa90-d924170688b1",
+      "name": "Verify State & Route Action",
+      "nodeIds": [
+        "246771cc-a3e3-49c4-9f68-6ce16e976260",
+        "21a360d8-7ba8-494d-acbf-8359011b9991",
+        "2ec45b4b-c824-4255-8c88-11fec4c5619f",
+        "2d1d89f1-2c50-4c06-92ed-c89f46146fda",
+        "a988516c-2f8d-4daf-8587-917f45bcd7ff",
+        "b5611a7c-09f8-4b50-bbfe-8770084973bf",
+        "6da4432f-a48f-46ae-9729-32951bc483e2"
+      ],
+      "description": "Loads inquiry and email draft, enforces pending state and idempotency_key, returning 404/409/500 on block."
+    },
+    {
+      "id": "61099883-4a03-4ff6-8c25-205bf3d35f37",
+      "name": "Approve & Send Email",
+      "nodeIds": [
+        "bfa36a6c-55f9-4866-9aee-cb17624348be",
+        "688e283d-4ff1-4c84-a635-75cf8f60ec97",
+        "94df48d1-88c2-49c7-855a-680540ca95ab",
+        "8a2acee9-3289-4d09-85b5-386b19b0a8ae",
+        "dbd27c11-af3e-4e6a-a64b-9c59045502c5",
+        "544c058f-94ac-43e2-8789-52dc77619a4c",
+        "7245e417-ae62-4f3d-8d0f-b2733b60ea1e",
+        "cae12aa9-bba5-41dd-80d8-658bbf72bd54",
+        "34599d11-13fd-44a4-ad09-ba686387a51a",
+        "750b5864-e1e4-4f50-9d76-af4ec716a64d",
+        "a5403969-2ee8-4361-a082-be5b5f262b9f"
+      ],
+      "description": "Queues draft, sends email via Resend with Idempotency-Key, updates Supabase, and logs delivery or 502 error."
+    },
+    {
+      "id": "b7031a3f-69b6-486e-9a12-1446e729bcf0",
+      "name": "Reject & Close Draft",
+      "nodeIds": [
+        "f09d68b0-6cc6-43d8-ad90-d6a41d2ca988",
+        "160cce74-511b-48ce-a74a-431a66a8b491",
+        "50e66616-2a9a-4f65-99ba-29d009f7ef62",
+        "49219bdb-31fd-4f21-ae58-96bf72c994c8",
+        "20c941e1-3343-411a-9b0b-dfc6483c95e7"
+      ],
+      "description": "Cancels pending draft without calling Resend, marks inquiry rejected/closed, logs audit trail, and returns HTTP 200."
+    }
+  ],
+  "tags": [
+    {
+      "name": "email-approval"
+    },
+    {
+      "name": "leadflow-ai"
+    },
+    {
+      "name": "wf02"
+    }
+  ]
+}
