@@ -127,8 +127,8 @@
       <p class="sub">Day 2 test utility for Veloce Digital lead intake. Matches <code>LeadFlowAI.sql</code> &amp; <code>test-data/mock-leads.json</code>.</p>
 
       <div class="field">
-        <label for="webhookUrl">n8n Webhook URL</label>
-        <input id="webhookUrl" type="url" value="http://localhost:5678/webhook-test/lead-intake" />
+        <label for="webhookUrl">Target Endpoint URL (Express API or n8n Webhook)</label>
+        <input id="webhookUrl" type="url" value="http://localhost:4000/api/leads" />
       </div>
 
       <div class="grid-2">
@@ -220,7 +220,7 @@
       </form>
 
       <div class="hint">
-        <strong>Tip:</strong> In n8n test mode (<code>/webhook-test/...</code>), click <strong>Listen for test event</strong> or <strong>Execute workflow</strong> before each POST. If browser CORS blocks direct requests from <code>file://</code>, use <strong>Copy PowerShell Command</strong> or run a local server / Node API (Day 3).
+        <strong>Tip:</strong> Default target points to the Express API Gateway (<code>http://localhost:4000/api/leads</code> — no secret header needed). To test n8n WF01 directly, switch URL to <code>http://localhost:5678/webhook/lead-intake</code> and provide <code>x-webhook-secret</code>. If browser CORS blocks direct requests from <code>file://</code>, use <strong>Copy PowerShell Command</strong>.
       </div>
     </div>
 
