@@ -1,0 +1,265 @@
+{
+  "name": "WF04 - Error Handling & Logging",
+  "description": "Captures unhandled production failures from WF01–WF03 via Error Trigger, logs redacted error rows to Supabase workflow_errors, and alerts admins on Slack even if DB logging fails.",
+  "nodes": [
+    {
+      "id": "05180033-36a7-4ed6-bb2e-50c864cf2543",
+      "name": "Workflow Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {},
+      "notes": "Catches unhandled production failures from WF01, WF02, and WF03."
+    },
+    {
+      "id": "0edeaef8-1e7f-4950-b808-41cd250c7053",
+      "name": "Normalize Error Context",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "err-workflow-name",
+              "name": "workflow_name",
+              "type": "string",
+              "value": "={{ String($('Workflow Error Trigger').item.json.workflow?.name || 'Unknown Workflow').slice(0, 200) }}"
+            },
+            {
+              "id": "err-workflow-id",
+              "name": "workflow_id",
+              "type": "string",
+              "value": "={{ String($('Workflow Error Trigger').item.json.workflow?.id || '') }}"
+            },
+            {
+              "id": "err-execution-id",
+              "name": "execution_id",
+              "type": "string",
+              "value": "={{ $('Workflow Error Trigger').item.json.execution?.id ? String($('Workflow Error Trigger').item.json.execution.id) : '' }}"
+            },
+            {
+              "id": "err-execution-url",
+              "name": "execution_url",
+              "type": "string",
+              "value": "={{ String($('Workflow Error Trigger').item.json.execution?.url || '') }}"
+            },
+            {
+              "id": "err-workflow-url",
+              "name": "workflow_url",
+              "type": "string",
+              "value": "={{ (() => {\n  // Strip /executions/<id> to derive the workflow editor link\n  const u = String($('Workflow Error Trigger').item.json.execution?.url || '');\n  return u.includes('/executions/') ? u.split('/executions/')[0] : u;\n})() }}"
+            },
+            {
+              "id": "err-node-name",
+              "name": "node_name",
+              "type": "string",
+              "value": "={{ String($('Workflow Error Trigger').item.json.execution?.lastNodeExecuted || 'Unknown Node').slice(0, 200) }}"
+            },
+            {
+              "id": "err-message",
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ (() => {\n  // Combine error message + description, redact secret-like tokens, cap at 1000 chars\n  const err = $('Workflow Error Trigger').item.json.execution?.error || {};\n  const msg = String(err.message || 'Unhandled workflow error');\n  const desc = err.description && String(err.description) !== msg ? ' — ' + String(err.description) : '';\n  const combined = (msg + desc)\n    .replace(/Bearer\\s+[A-Za-z0-9._-]+/gi, 'Bearer [REDACTED]')\n    .replace(/\\b(?:sk-|re_|pat-|xox[bp]-|n8n_api_)[A-Za-z0-9_-]+/g, '[REDACTED]')\n    .replace(/\\beyJ[A-Za-z0-9_-]{15,}\\.[A-Za-z0-9._-]+/g, '[REDACTED_JWT]');\n  return combined.slice(0, 1000);\n})() }}"
+            },
+            {
+              "id": "err-timestamp",
+              "name": "error_timestamp",
+              "type": "string",
+              "value": "={{ (() => {\n  const ts = $('Workflow Error Trigger').item.json.execution?.error?.timestamp;\n  return ts ? DateTime.fromMillis(Number(ts)).toUTC().toISO() : DateTime.now().toUTC().toISO();\n})() }}"
+            },
+            {
+              "id": "err-submission-id",
+              "name": "submission_id",
+              "type": "string",
+              "value": "={{ (() => {\n  // Best-effort extraction of submission_id when present in error payload\n  const raw = JSON.stringify($('Workflow Error Trigger').item.json.execution?.error || {});\n  const match = raw.match(/\\bsub_[a-zA-Z0-9_-]{4,64}\\b/);\n  return match ? match[0] : '';\n})() }}"
+            }
+          ]
+        }
+      },
+      "notes": "Normalizes Error Trigger payload for both Supabase logging and Slack alerting, redacting any accidental token/secret substrings."
+    },
+    {
+      "id": "fa099b4d-b362-4516-8034-5c59f031b78d",
+      "name": "Record Workflow Error",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "workflow_errors",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "={{ $('Normalize Error Context').item.json.workflow_name }}"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $('Normalize Error Context').item.json.execution_id || null }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "={{ $('Normalize Error Context').item.json.node_name }}"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ $('Normalize Error Context').item.json.error_message }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Normalize Error Context').item.json.submission_id || null }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        }
+      },
+      "notes": "Persists open error record into public.workflow_errors. Uses continueErrorOutput so Slack alert still fires if Supabase is down.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      }
+    },
+    {
+      "id": "dea5e31c-396f-488b-99f3-3dac264e6499",
+      "name": "Prepare Admin Alert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {},
+      "notes": "Convergence point for both Supabase success and failure outputs so Slack alert always fires."
+    },
+    {
+      "id": "9d84d245-f511-4fa1-82f8-989812ae21e5",
+      "name": "Send Slack Admin Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#sales-leads"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ (() => {\n  // Build Slack Block Kit admin error alert with workflow + execution links and DB persistence status\n  const ctx = $('Normalize Error Context').item.json;\n  const dbRes = $('Prepare Admin Alert').item.json || {};\n  const dbId = dbRes.id && !dbRes.error ? String(dbRes.id) : null;\n  const dbStatus = dbId\n    ? 'Recorded (ID: `' + dbId + '`)'\n    : '⚠️ Failed to write to Supabase workflow_errors';\n  const headerText = ('🚨 [WORKFLOW ERROR] ' + ctx.workflow_name).slice(0, 150);\n  const fields = [\n    { type: 'mrkdwn', text: '*Workflow:*\\n' + ctx.workflow_name + (ctx.workflow_id ? ' (`' + ctx.workflow_id + '`)' : '') },\n    { type: 'mrkdwn', text: '*Failed Node:*\\n`' + ctx.node_name + '`' },\n    { type: 'mrkdwn', text: '*Execution ID:*\\n`' + (ctx.execution_id || 'n/a') + '`' },\n    { type: 'mrkdwn', text: '*Timestamp (UTC):*\\n' + ctx.error_timestamp },\n    { type: 'mrkdwn', text: '*Supabase Log:*\\n' + dbStatus },\n  ];\n  if (ctx.submission_id) {\n    fields.push({ type: 'mrkdwn', text: '*Submission ID:*\\n`' + ctx.submission_id + '`' });\n  }\n  const links = [];\n  if (ctx.execution_url) links.push('<' + ctx.execution_url + '|Open Failed Execution>');\n  if (ctx.workflow_url) links.push('<' + ctx.workflow_url + '|Open Workflow Editor>');\n  links.push('<http://localhost:5173/dashboard|Open LeadFlow Dashboard>');\n\n  return {\n    blocks: [\n      {\n        type: 'header',\n        text: { type: 'plain_text', text: headerText, emoji: true },\n      },\n      {\n        type: 'section',\n        fields,\n      },\n      {\n        type: 'section',\n        text: {\n          type: 'mrkdwn',\n          text: '*Error Message:*\\n```' + String(ctx.error_message || '').slice(0, 900) + '```',\n        },\n      },\n      { type: 'divider' },\n      {\n        type: 'section',\n        text: {\n          type: 'mrkdwn',\n          text: '🔧 *Quick Links:* ' + links.join('  |  '),\n        },\n      },\n      {\n        type: 'context',\n        elements: [\n          {\n            type: 'mrkdwn',\n            text: 'WF04 Error Handler | Safe retry protected by submission_id, email idempotency_key & HubSpot email upsert.',\n          },\n        ],\n      },\n    ],\n  };\n})() }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true,
+          "unfurl_links": false,
+          "unfurl_media": false
+        }
+      },
+      "notes": "Posts structured Block Kit error alert to #sales-leads with workflow editor link, execution link, and DB error record ID.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_SLACK_CREDENTIAL_ID",
+          "name": "Slack LeadFlow"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Workflow Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Error Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Error Context": {
+      "main": [
+        [
+          {
+            "node": "Record Workflow Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Prepare Admin Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Admin Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Admin Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Admin Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "tags": [
+    {
+      "name": "error-handling"
+    },
+    {
+      "name": "leadflow-ai"
+    },
+    {
+      "name": "wf04"
+    }
+  ]
+}
