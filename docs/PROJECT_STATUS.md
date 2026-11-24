@@ -4,20 +4,20 @@
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 9 (Human Approval Dashboard)
-- **Active Git Branch:** `main` *(Day 8 merged; next: `feat/day9-approval-dashboard`)*
-- **Overall Progress:** `28 / 51` roadmap tasks completed (`54.9%`)
+- **Current Roadmap Day:** Day 10 (Email Automation — WF02)
+- **Active Git Branch:** `feat/day9-approval-dashboard` *(Day 9 verified; ready to commit & merge into `main`)*
+- **Overall Progress:** `31 / 51` roadmap tasks completed (`60.8%`)
 - **Last Updated:** 2026-11-24
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Day 8 — Slack Notification (`3 / 3` COMPLETED & merged into `main`): connected Slack Bot credential (`Slack LeadFlow`, `slackApi`) to `#sales-leads` (`C0CLD14M0Q4`), added 6 nodes + Stage 5 group `Notify Sales on Slack` to `WF01` (`Mynf0z0HIudjtNXF`, 48 nodes, 5 stage groups, active version `e2b1898e-686d-4af0-ac53-d16ca33d00b1`): `If Slack Alert Eligible` (ADR-003 OR-filter for `qualified`/`needs_review`), `Send Slack Lead Alert` (Block Kit `{ blocks }` with `[HIGH PRIORITY]`/`[NEEDS REVIEW]` badges, AI summary, missing info, HubSpot ID, dashboard review link `http://localhost:5173/inquiries/<id>`, attribution off, `retryOnFail` 3x5s, `onError: continueErrorOutput`), `Log Slack Alert Sent`, `Log Slack Alert Skipped`, `Record Slack Error`, and `Log Slack Alert Failed`. Exported sanitized [`wf01-lead-intake-qualification.json`](../n8n/workflows/wf01-lead-intake-qualification.json) (0 leaks). Dual-verified 4/4 live E2E cases (`TC01` `[HIGH PRIORITY]` sent `ts=1795454967.317649`, `TC04` `[NEEDS REVIEW]` sent `ts=1795454979.111819`, `TC05` low budget skipped, `TC07` spam skipped both HubSpot & Slack) + error isolation verified + clean Supabase teardown.
-2. **Current State / Branch:** `main` is clean with Days 1–8 merged (`feat/day8-slack-alerts` merged with `--no-ff` and deleted; `main` local is ahead of `origin/main` — push when ready). Entire **WF01 (`Lead Intake & Qualification`)** is now 100% feature-complete (Intake → Validation/Dedup → DeepSeek AI → Deterministic Scoring → HubSpot CRM → Slack Alerts)!
-3. **Blockers / Pending Actions:** Before Day 9 live login verification, create at least one reviewer user in Supabase `auth.users` (and set `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` in `.env`). Deferred non-blocking items: (a) configure Resend API credential in n8n before Day 10 (`WF02`); (b) separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Create branch `feat/day9-approval-dashboard` from `main`, and implement **Day 9 — Human Approval Dashboard** (`1 / 4` already done via RLS; build authenticated Express `GET /api/inquiries`, `GET /api/inquiries/:id`, `POST /api/inquiries/:id/approve`, `POST /api/inquiries/:id/reject`, `PATCH /api/inquiries/:id/status` + React Review Dashboard with Supabase Auth login, AI summary, `score_breakdown`, and editable email draft).
-5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md` (ADR-002/003), `n8n/workflows/wf01-lead-intake-qualification.json`.
+1. **Last Completed:** Day 9 — Human Approval Dashboard (`4 / 4` COMPLETED on `feat/day9-approval-dashboard`): implemented Supabase JWT authentication middleware (`requireAuth` verifying tokens server-side via `supabaseAuthClient.auth.getUser(token)`), Zod validators, WF02 webhook forwarder (`forwardApprovalToWf02`), and all 6 protected Express routes (`GET /api/inquiries`, `GET /api/inquiries/:id`, `POST /api/inquiries/:id/approve`, `POST /api/inquiries/:id/reject`, `PATCH /api/inquiries/:id/status`, `GET /api/workflow-errors`); built the React Review Dashboard (`frontend/` with `@supabase/supabase-js` anon key only + `react-router-dom`) featuring `/login`, protected `/dashboard` & Slack deep-link `/inquiries/:id`, KPI strip, queue filters, AI Qualification Summary, 4-axis Deterministic Score Breakdown (`0–100`), operational `email_messages` editor with raw AI snapshot comparison, manual lifecycle controls (`replied`/`closed`/`won`/`unsubscribed`), activity timeline, and Workflow Errors monitor. Provisioned reviewer user (`qa-rep@velocedigital.test` in Supabase `auth.users`), dual-verified API + JWT 401 + RLS anon denial + DB status/audit writes + mock WF02 `202` forwarding & `502` fallback + live browser UI login/deep-link + clean teardown + `0` frontend secret hits.
+2. **Current State / Branch:** `feat/day9-approval-dashboard` has all Day 9 backend, frontend, and status updates ready to review, commit, and merge (`--no-ff`) into `main`. (Note: if a pre-Day-9 backend process is still running on port `4000`, restart it so it picks up the new `/api/inquiries` routes.)
+3. **Blockers / Pending Actions:** Configure **Resend API** credential (`RESEND_API_KEY`) in local n8n before implementing Day 10 (`WF02 — Human Approval & Email Sending`). Deferred non-blocking item: separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
+4. **Next Immediate Action:** Commit & merge `feat/day9-approval-dashboard` into `main`, then branch `feat/day10-email-automation` to build **Day 10 — Email Automation (`WF02`)**: webhook trigger `/webhook/lead-approval` (`x-webhook-secret`), `approval_status`/`email_messages` guard + `idempotency_key` (`email:<inquiry_id>:initial`), Resend API delivery with `Idempotency-Key`, DB updates (`email_messages`, `inquiries.lead_status='contacted'`, `followup_status='scheduled'`, `activity_logs`), and reject path (`rejected`/`cancelled`/`closed`).
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md` (ADR-002), `backend/src/services/n8n.service.ts`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`28 / 51`)
+## 14-Day Master Roadmap Checklist (`31 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -75,11 +75,11 @@
 - [x] Format structured notification message with dashboard review link
 - [x] Alert only for `qualified` (`[HIGH PRIORITY]`) and `needs_review` (`[NEEDS REVIEW]`) leads
 
-### Day 9 — Human Approval Dashboard (`1 / 4`)
-- [x] Apply Supabase Auth & RLS policies (`database/policies/`) *(6/6 tables RLS + least-privilege grants verified on `leadflow-ai`; create reviewer user in `auth.users` when testing Day 9 login)*
-- [ ] Build lead review dashboard screen showing AI summary, score breakdown & email draft (`frontend/`)
-- [ ] Build authenticated Approve / Reject endpoints (`backend/`)
-- [ ] Verify JWT authentication & authorization before executing actions
+### Day 9 — Human Approval Dashboard (`4 / 4`)
+- [x] Apply Supabase Auth & RLS policies (`database/policies/`) *(6/6 tables RLS + least-privilege grants verified on `leadflow-ai`; reviewer user provisioned in `auth.users`)*
+- [x] Build lead review dashboard screen showing AI summary, score breakdown & email draft (`frontend/`)
+- [x] Build authenticated Approve / Reject endpoints (`backend/`)
+- [x] Verify JWT authentication & authorization before executing actions
 
 ### Day 10 — Email Automation (`0 / 4`)
 - [ ] Connect Resend email provider in WF02
