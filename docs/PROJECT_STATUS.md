@@ -3,21 +3,21 @@
 > **Single Source of Truth** for project progress (51 tasks across 14 days) and cross-session continuity.
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
-- **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 13 (Hybrid End-to-End Testing)
-- **Active Git Branch:** `main` *(Day 12 `feat/day12-error-handling-wf04` merged)*
-- **Overall Progress:** `43 / 51` roadmap tasks completed (`84.3%`)
+- **Current Workflow Stage:** Stage 4 (Optimization & Portfolio Handover) — Ready
+- **Current Roadmap Day:** Day 14 (Finalize Upwork Portfolio)
+- **Active Git Branch:** `main` *(Day 13 `test/day13-e2e-report` merged)*
+- **Overall Progress:** `47 / 51` roadmap tasks completed (`92.2%`)
 - **Last Updated:** 2026-11-24
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Completed **Day 12 — Error Handling (`WF04 - Error Handling & Logging`, id `ZEuoQ3p8ScYgsoz8`, 5 nodes, tags `wf04`/`error-handling`/`leadflow-ai`)** in `n8n/workflows/wf04-error-handling.json` (ADR-009): Error Trigger → secret-redacting normalizer → Supabase `workflow_errors` (`continueErrorOutput` fallback) → NoOp convergence → Slack Block Kit `[WORKFLOW ERROR]` alert in `#sales-leads`. Wired `settings.errorWorkflow = ZEuoQ3p8ScYgsoz8` and re-published `WF01`, `WF02`, and `WF03`. Live verified via production failure probe (WF04 exec `79`: DB `open` row with redacted tokens + Slack `ok: true`) and live safe-retry tests across WF01 (`409` duplicate `submission_id` + HubSpot upsert `is_new: false`), WF02 (`409` duplicate approve), and WF03 (failed follow-up no-spam + clean retry). All Day 12 test rows and probe workflow cleaned up; `leadflow-n8n-sanitize` passed across all 4 workflows.
-2. **Current State / Branch:** Clean `main` after merging `feat/day12-error-handling-wf04`. All 4 workflows (`WF01`, `WF02`, `WF03`, `WF04`) are `[ACTIVE]` on local n8n with credentials bound and `errorWorkflow` wired.
-3. **Blockers / Pending Actions:** Before running Day 13 automated Vitest suite (`tests/scripts/*.test.ts`), confirm whether to provision a dedicated Supabase test project (`TEST_SUPABASE_URL` per `TESTING_STRATEGY.md` / ADR-006) or obtain explicit approval for scoped test-prefix execution.
-4. **Next Immediate Action:** Branch `test/day13-e2e-report` from `main` and implement **Day 13 — Hybrid End-to-End Testing** (12–15 Vitest integration tests with async polling + dual API/DB PASS gate, 3–5 manual `test-form.html` scenarios, and `tests/reports/e2e-report.md`).
-5. **Key Reference Files:** `AGENTS.md`, `docs/TESTING_STRATEGY.md`, `test-data/mock-leads.json`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md`.
+1. **Last Completed:** Completed **Day 13 — Hybrid End-to-End Testing** (ADR-010): added root Vitest runner (`package.json`, `vitest.config.ts`), reusable helpers (`tests/scripts/helpers/{env,poll,cleanup,mockLeads}.ts`), **15 automated Vitest integration tests** (`tests/scripts/01–03*.test.ts`), updated `tests/test-form.html` default endpoint to `http://localhost:4000/api/leads`, verified **5 manual `test-form.html` scenarios** (`MT-01`–`MT-05`), and published **`tests/reports/e2e-report.md`**. Full Dual API + DB PASS: **`20 / 20`** (`15/15` Vitest in `48.09s` + `5/5` manual), `backend` + `frontend` `tsc --noEmit` clean, `0` frontend secret leaks, and `0` residual test rows in Supabase.
+2. **Current State / Branch:** Clean `main` after merging `test/day13-e2e-report`. Stage 3 (Days 3–13) is 100% complete; all 4 workflows (`WF01`–`WF04`) are `[ACTIVE]` on local n8n with `errorWorkflow` wired.
+3. **Blockers / Pending Actions:** None. Only Day 14 portfolio handover remains (`4` tasks).
+4. **Next Immediate Action:** Branch `docs/day14-portfolio-handover` from `main` for **Day 14 — Finalize Upwork Portfolio**: clean UI & demo data, sync final counts/DeepSeek ADR into `docs/portfolio/*`, final `leadflow-n8n-sanitize` audit on all 4 workflows, write complete `README.md`, and guide 60–90s demo video + `v1.0.0` tag.
+5. **Key Reference Files:** `AGENTS.md`, `tests/reports/e2e-report.md`, `docs/DECISIONS.md`, `docs/portfolio/LeadFlow_AI_Upwork_Portfolio.md`, `docs/portfolio/LeadFlow_AI_Upwork_Portfolio_EN.md`.
 
 ---
 
@@ -25,12 +25,12 @@
 
 - [x] **Stage 1 — Foundation:** Core `.md` context system, ADRs, API/RLS contract, testing spec, `.env.example` templates, Git workflow committed.
 - [x] **Stage 2 — AI Dev Environment:** `.agents/rules/`, `.agents/skills/`, additive SQL migration `002`, RLS & grants SQL `001`, and `n8n/scripts/sync-workflows.ts` verified against local n8n REST API.
-- [ ] **Stage 3 — Development Workflow (Days 3–13):** Full-stack + 4 n8n workflows + Supabase RLS + Hybrid Testing report (`e2e-report.md`).
+- [x] **Stage 3 — Development Workflow (Days 3–13):** Full-stack + 4 n8n workflows + Supabase RLS + Hybrid Testing report (`e2e-report.md`).
 - [ ] **Stage 4 — Optimization & Portfolio Handover (Day 14):** Prune unused rules/skills, sanitize n8n JSON, sync Portfolio docs, finalize `README.md`, record 60–90s demo, tag `v1.0.0`.
 
 ---
 
-## 14-Day Master Roadmap Checklist (`43 / 51`)
+## 14-Day Master Roadmap Checklist (`47 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -99,11 +99,11 @@
 - [x] Send Slack admin alert on failure
 - [x] Verify safe retries without duplicate emails or duplicate CRM contacts
 
-### Day 13 — Hybrid End-to-End Testing (`0 / 4`)
-- [ ] Run automated Vitest tests: valid leads, missing fields, invalid email, auth checks
-- [ ] Run automated Vitest tests: duplicate `submission_id`, existing contact new inquiry, webhook replay
-- [ ] Run automated Vitest tests: malformed AI JSON, upstream failures, rejected/unapproved leads
-- [ ] Verify no email without consent/approval, execute 3–5 manual `test-form.html` cases, publish `tests/reports/e2e-report.md`
+### Day 13 — Hybrid End-to-End Testing (`4 / 4`)
+- [x] Run automated Vitest tests: valid leads, missing fields, invalid email, auth checks
+- [x] Run automated Vitest tests: duplicate `submission_id`, existing contact new inquiry, webhook replay
+- [x] Run automated Vitest tests: malformed AI JSON, upstream failures, rejected/unapproved leads
+- [x] Verify no email without consent/approval, execute 3–5 manual `test-form.html` cases, publish `tests/reports/e2e-report.md`
 
 ### Day 14 — Finalize Upwork Portfolio (`0 / 4`)
 - [ ] Clean UI and demo data; sync final counts into `docs/portfolio/*`

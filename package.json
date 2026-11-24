@@ -1,0 +1,19 @@
+{
+  "name": "leadflow-ai-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LeadFlow AI — Root test runner and workspace scripts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck:backend": "npm --prefix backend run typecheck",
+    "typecheck:frontend": "npm --prefix frontend run typecheck",
+    "typecheck": "npm run typecheck:backend && npm run typecheck:frontend",
+    "n8n:check": "node --env-file=.env n8n/scripts/sync-workflows.ts --check"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.119.2",
+    "dotenv": "^16.4.7",
+    "vitest": "^3.2.4"
+  }
+}
