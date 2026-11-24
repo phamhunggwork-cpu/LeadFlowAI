@@ -1,23 +1,23 @@
-# Project Status & Session Handoff — LeadFlow AI
+﻿# Project Status & Session Handoff — LeadFlow AI
 
 > **Single Source of Truth** for project progress (51 tasks across 14 days) and cross-session continuity.
 > Portfolio docs in `docs/portfolio/` are frozen until Day 14 final sync — always update progress HERE only.
 
 - **Current Workflow Stage:** Stage 3 (Development Workflow) — In Progress
-- **Current Roadmap Day:** Day 11 (Follow-up Automation — WF03)
-- **Active Git Branch:** `main` *(Day 10 WF02 merged; ready to branch `feat/day11-followup-wf03`)*
-- **Overall Progress:** `35 / 51` roadmap tasks completed (`68.6%`)
+- **Current Roadmap Day:** Day 12 (Error Handling — WF04)
+- **Active Git Branch:** `main` *(Day 11 `feat/day11-followup-wf03` merged)*
+- **Overall Progress:** `39 / 51` roadmap tasks completed (`76.5%`)
 - **Last Updated:** 2026-11-24
 
 ---
 
 ## Session Handoff (Read First & Update Before Closing Every Session)
 
-1. **Last Completed:** Merged **Day 10 — Email Automation (`WF02 - Human Approval & Email Sending`, id `009W0gN8GheJZBoF`, 27 nodes, 4 node groups)** into `main` (`n8n/workflows/wf02-human-approval-email.json`): `x-webhook-secret` auth, Set IIFE payload validator, pending-state & `email:<inquiry_id>:initial` idempotency guard (`404`/`409`), queued draft lock, Resend API delivery (`Veloce Digital <onboarding@resend.dev>`, `Resend LeadFlow` Bearer Auth, `Idempotency-Key` header), Supabase state transitions (`email_messages`, `inquiries.lead_status='contacted'`, conditional `followup_status='scheduled'|'not_eligible'`, `activity_logs`), Resend failure isolation (`failed` + `workflow_errors` + HTTP `502`), and zero-email reject path (`cancelled`/`rejected`/`closed`). All 7/7 live API+Resend+DB checks, `typecheck`, and `leadflow-n8n-sanitize` passed.
-2. **Current State / Branch:** Clean working tree on `main`. Both `WF01` (`Mynf0z0HIudjtNXF`) and `WF02` (`009W0gN8GheJZBoF`) are `[ACTIVE]` on local n8n.
-3. **Blockers / Pending Actions:** No Day 11 blockers (`Resend LeadFlow` and `Supabase LeadFlow` are configured; Resend sandbox sends from `onboarding@resend.dev` to the Resend account owner email or `delivered+*@resend.dev` until a custom domain is verified). Deferred non-blocking item: separate test Supabase project or strict `TEST_RUN_PREFIX` cleanup before Day 13.
-4. **Next Immediate Action:** Branch `feat/day11-followup-wf03` from `main` to build **Day 11 — Automated Follow-up (`WF03`)**: Schedule Trigger querying 24h+ `contacted` + `followup_status='scheduled'` + `consent_to_email=true` + `unsubscribed_at IS NULL` leads, single follow-up via Resend (`Idempotency-Key: email:<inquiry_id>:follow_up_1`), updating `email_messages`, `inquiries.followup_status='sent'`, and `activity_logs`.
-5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md`, `n8n/workflows/wf02-human-approval-email.json`.
+1. **Last Completed:** Completed **Day 11 — Follow-up Automation (`WF03 - Automated Follow-up`, id `O6dCV2xYR49EpYhN`, 18 nodes, 4 node groups, tags `wf03`/`followup`/`leadflow-ai`)** in `n8n/workflows/wf03-automated-followup.json` + unit-tested `n8n/code-nodes/evaluate-followup.js` (ADR-008): hourly Schedule Trigger, deterministic 24h+ eligibility and stop rules (unsubscribed, replied, closed, won, no consent → `followup_status=stopped`), fixed-template follow-up via Resend with `Idempotency-Key email:<inquiry_id>:follow_up_1`, queued-row duplicate lock, failure isolation (`failed` + `workflow_errors`), and reconcile of partially-sent leads. Live verified (executions 74–77), Day 11 test data cleaned from Supabase (`0` residual `d11test-%` rows; inquiry `718dbac6-...` restored), `leadflow-n8n-sanitize` passed, and WF03 published `[ACTIVE]`.
+2. **Current State / Branch:** Clean `main` after merging `feat/day11-followup-wf03`. `WF01`, `WF02`, and `WF03` are all `[ACTIVE]` on local n8n with credentials bound.
+3. **Blockers / Pending Actions:** None for Day 11. Deferred: provision separate test Supabase project (`TEST_SUPABASE_URL`) before Day 13 automated Vitest suite.
+4. **Next Immediate Action:** Branch `feat/day12-error-handling-wf04` from `main` and implement **Day 12 — WF04 Error Handling** (Error Trigger, `workflow_errors` logging, Slack admin alert, wire `errorWorkflow` on WF01–WF03, and verify safe retry without duplicate emails or duplicate CRM contacts).
+5. **Key Reference Files:** `AGENTS.md`, `database/schema/LeadFlowAI.sql`, `docs/architecture/03-api-and-rls-contract.md`, `docs/DECISIONS.md`, `n8n/workflows/wf03-automated-followup.json`.
 
 ---
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 14-Day Master Roadmap Checklist (`35 / 51`)
+## 14-Day Master Roadmap Checklist (`39 / 51`)
 
 ### Day 1 — Business Problem & Requirements (`3 / 3`)
 - [x] Write simulated company profile (Veloce Digital) and lead intake process (`docs/architecture/01-business-context.md`)
@@ -87,11 +87,11 @@
 - [x] Log delivery (`email_messages.status`, `provider_message_id`, `sent_at`) and `activity_logs`
 - [x] Prevent duplicate sending via `idempotency_key` (`email:<inquiry_id>:initial`)
 
-### Day 11 — Follow-up Automation (`0 / 4`)
-- [ ] Create WF03 Schedule Trigger querying 24h+ eligible leads
-- [ ] Verify status, `consent_to_email = true`, `unsubscribed_at IS NULL`, no reply, not `closed`/`won`
-- [ ] Send single conditional follow-up email with `Idempotency-Key`
-- [ ] Stop sequence on reply, unsubscribe, `closed`, or `won`
+### Day 11 — Follow-up Automation (`4 / 4`)
+- [x] Create WF03 Schedule Trigger querying 24h+ eligible leads
+- [x] Verify status, `consent_to_email = true`, `unsubscribed_at IS NULL`, no reply, not `closed`/`won`
+- [x] Send single conditional follow-up email with `Idempotency-Key`
+- [x] Stop sequence on reply, unsubscribe, `closed`, or `won`
 
 ### Day 12 — Error Handling (`0 / 4`)
 - [ ] Create WF04 Error Trigger workflow
@@ -110,3 +110,5 @@
 - [ ] Export and sanitize all 4 workflow JSON files (`leadflow-n8n-sanitize`)
 - [ ] Write complete `README.md` with architecture diagram, setup guide, credentials & test results
 - [ ] Record 60–90s demo video and tag `v1.0.0`
+
+

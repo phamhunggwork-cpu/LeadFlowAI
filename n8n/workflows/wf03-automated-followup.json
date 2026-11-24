@@ -1,0 +1,984 @@
+{
+  "name": "WF03 - Automated Follow-up",
+  "description": "Hourly schedule that sends one deterministic follow-up 24h+ after a delivered initial email, and stops the sequence on unsubscribe, reply, closed, won, or missing consent.",
+  "nodes": [
+    {
+      "id": "6e49ddcd-9b36-4d2f-8b62-41e1509f3574",
+      "typeVersion": 1.4,
+      "name": "Hourly Follow-up Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [
+        0,
+        304
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "notes": "Runs hourly at :05. Eligibility (24h+ after delivered initial email) is evaluated deterministically downstream."
+    },
+    {
+      "id": "8f669344-3871-434a-8bc2-79e525d7d265",
+      "typeVersion": 1,
+      "name": "Fetch Scheduled Inquiries",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        224,
+        304
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "inquiries",
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "followup_status",
+              "condition": "eq",
+              "keyValue": "scheduled"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Loads every inquiry still in followup_status=scheduled. Stop rules (unsubscribed, replied, closed, won, no consent) are applied in the eligibility node so those leads can be moved to stopped.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true
+    },
+    {
+      "id": "b2ed5e50-72ef-4732-8785-4c4c1e47ae7f",
+      "typeVersion": 1,
+      "name": "Fetch Initial Emails",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        448,
+        304
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "email_messages",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "={{ 'inquiry_id=in.(' + ($('Fetch Scheduled Inquiries').all().map((i) => i.json.id).filter((v) => /^[0-9a-f-]{36}$/i.test(v || '')).join(',') || '00000000-0000-0000-0000-000000000000') + ')&message_type=eq.initial&status=eq.sent' }}"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Delivered initial emails for the scheduled inquiries (sent_at drives the 24h window; recipient_email is reused).",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "5ae7a5e9-a05e-4fdf-bfba-19ba77bbc031",
+      "typeVersion": 1,
+      "name": "Fetch Existing Follow-ups",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        672,
+        304
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "email_messages",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "={{ 'inquiry_id=in.(' + ($('Fetch Scheduled Inquiries').all().map((i) => i.json.id).filter((v) => /^[0-9a-f-]{36}$/i.test(v || '')).join(',') || '00000000-0000-0000-0000-000000000000') + ')&message_type=eq.follow_up' }}"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Existing follow_up rows in any status. A lead never gets a second automated follow-up.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "a9b02887-c544-47eb-9f5d-30e2fe2f4b55",
+      "typeVersion": 1,
+      "name": "Fetch Lead Contacts",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        896,
+        304
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "getAll",
+        "tableId": "contacts",
+        "returnAll": true,
+        "filterType": "string",
+        "filterString": "={{ 'id=in.(' + ($('Fetch Scheduled Inquiries').all().map((i) => i.json.contact_id).filter((v) => /^[0-9a-f-]{36}$/i.test(v || '')).join(',') || '00000000-0000-0000-0000-000000000000') + ')' }}"
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "notes": "Contact names for first-name personalization only.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "id": "c6268f20-d610-4213-917d-40ff9ce6efcb",
+      "typeVersion": 2,
+      "name": "Evaluate Follow-up Eligibility",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1120,
+        304
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Synced with n8n/code-nodes/evaluate-followup.js (deterministic follow-up eligibility for WF03)\nconst FOLLOWUP_DELAY_HOURS = 24;\nconst MAX_BATCH = 25;\nconst STOP_LEAD_STATUSES = ['replied', 'closed', 'won'];\n\nfunction firstNameOf(fullName) {\n  const first = String(fullName || '').trim().split(/\\s+/)[0];\n  return first || 'there';\n}\n\nfunction buildFollowupEmail(firstName, serviceType) {\n  const topic = serviceType ? `your ${serviceType} project` : 'your project';\n  return {\n    subject: 'Following up on your project inquiry',\n    body: [\n      `Hi ${firstName},`,\n      '',\n      `I wanted to follow up on your recent inquiry with Veloce Digital about ${topic}. If you are still exploring options, we would be glad to answer questions or set up a short call to talk through scope and timeline.`,\n      '',\n      'Simply reply to this email and we will pick the conversation up from there. If you would rather not receive further emails from us, just let us know and we will stop.',\n      '',\n      'Best regards,',\n      'Veloce Digital Team',\n    ].join('\\n'),\n  };\n}\n\nfunction evaluateFollowups({ inquiries, initialEmails, followupEmails, contacts, now = new Date() }) {\n  const valid = (rows) => (rows || []).filter((r) => r && r.id);\n  const contactById = new Map(valid(contacts).map((c) => [c.id, c]));\n  const nowMs = now.getTime();\n  const out = [];\n\n  for (const inq of valid(inquiries)) {\n    if (inq.followup_status !== 'scheduled') continue;\n\n    // 1. Stop rules (sequence ends permanently)\n    let stopReason = null;\n    if (inq.unsubscribed_at) stopReason = 'unsubscribed';\n    else if (STOP_LEAD_STATUSES.includes(inq.lead_status)) stopReason = `lead_${inq.lead_status}`;\n    else if (inq.consent_to_email !== true) stopReason = 'consent_missing';\n    if (stopReason) {\n      out.push({\n        action: 'finalize',\n        inquiry_id: inq.id,\n        next_followup_status: 'stopped',\n        reason: stopReason,\n        lead_status: inq.lead_status,\n      });\n      continue;\n    }\n\n    // 2. Only `contacted` leads are eligible; everything else is left untouched\n    if (inq.lead_status !== 'contacted') continue;\n\n    // 3. Reconcile: follow-up already exists\n    const existing = valid(followupEmails).filter((m) => m.inquiry_id === inq.id);\n    if (existing.length > 0) {\n      if (existing.some((m) => m.status === 'sent')) {\n        out.push({\n          action: 'finalize',\n          inquiry_id: inq.id,\n          next_followup_status: 'sent',\n          reason: 'follow_up_already_sent',\n          lead_status: inq.lead_status,\n        });\n      }\n      // queued / failed rows are never re-sent automatically (idempotency_key is unique)\n      continue;\n    }\n\n    // 4. Need a delivered initial email older than the delay window\n    const sentInitials = valid(initialEmails)\n      .filter((m) => m.inquiry_id === inq.id && m.status === 'sent' && m.sent_at)\n      .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());\n    const initial = sentInitials[0];\n    if (!initial) continue;\n    const ageHours = (nowMs - new Date(initial.sent_at).getTime()) / 3600000;\n    if (!(ageHours >= FOLLOWUP_DELAY_HOURS)) continue;\n\n    const recipient = String(initial.recipient_email || '').trim().toLowerCase();\n    if (!recipient) continue;\n\n    const contact = contactById.get(inq.contact_id);\n    const email = buildFollowupEmail(firstNameOf(contact && contact.full_name), inq.service_type);\n    out.push({\n      action: 'send',\n      inquiry_id: inq.id,\n      submission_id: inq.submission_id,\n      recipient_email: recipient,\n      subject: email.subject,\n      body: email.body,\n      idempotency_key: `email:${inq.id}:follow_up_1`,\n      initial_email_id: initial.id,\n      hours_since_initial: Math.floor(ageHours),\n    });\n  }\n\n  // Cap sends per run; finalize actions are cheap and always processed\n  let sends = 0;\n  return out.filter((o) => (o.action === 'send' ? ++sends <= MAX_BATCH : true));\n}\n\nconst rows = (name) => $(name).all().map((i) => i.json);\nconst actions = evaluateFollowups({\n  inquiries: rows('Fetch Scheduled Inquiries'),\n  initialEmails: rows('Fetch Initial Emails'),\n  followupEmails: rows('Fetch Existing Follow-ups'),\n  contacts: rows('Fetch Lead Contacts'),\n  now: new Date(),\n});\nreturn actions.map((json) => ({ json }));"
+      },
+      "notes": "Pure deterministic JS (no LLM). Emits action=send for due leads and action=finalize for leads to stop or reconcile. Copy of n8n/code-nodes/evaluate-followup.js.",
+      "executeOnce": true
+    },
+    {
+      "id": "4108aa56-f397-4015-9054-fd30a147e84b",
+      "typeVersion": 2.2,
+      "name": "If Action Is Send",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        1344,
+        304
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ff40755c-317b-4081-939f-f7d9861cfcad",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "send",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4761258d-c9d9-488a-9d6f-40a64457878a",
+      "typeVersion": 1,
+      "name": "Queue Follow-up Email",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        1568,
+        176
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "email_messages",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "follow_up"
+            },
+            {
+              "fieldId": "direction",
+              "fieldValue": "outbound"
+            },
+            {
+              "fieldId": "recipient_email",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.recipient_email }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.subject }}"
+            },
+            {
+              "fieldId": "body",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.body }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "queued"
+            },
+            {
+              "fieldId": "idempotency_key",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.idempotency_key }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000,
+      "notes": "Inserting the row is the duplicate lock: idempotency_key is UNIQUE, so a concurrent or repeated run cannot queue a second follow-up.",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "e2873166-00a7-4825-9151-170a5ac584ad",
+      "typeVersion": 4.5,
+      "name": "Send Follow-up via Resend",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1792,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('Evaluate Follow-up Eligibility').item.json.idempotency_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { from: \"Veloce Digital <onboarding@resend.dev>\", to: [$('Evaluate Follow-up Eligibility').item.json.recipient_email], subject: $('Evaluate Follow-up Eligibility').item.json.subject, text: $('Evaluate Follow-up Eligibility').item.json.body } }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_WITH_RESEND_CREDENTIAL_ID",
+          "name": "Resend LeadFlow"
+        }
+      },
+      "notes": "Single follow-up via Resend with Idempotency-Key email:<inquiry_id>:follow_up_1 (24h provider-side dedup).",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "be50b783-84ed-4f04-acb4-7b00b97fddab",
+      "typeVersion": 1,
+      "name": "Mark Follow-up Sent",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        2016,
+        16
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "email_messages",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Queue Follow-up Email').item.json.id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "sent"
+            },
+            {
+              "fieldId": "provider_message_id",
+              "fieldValue": "={{ $('Send Follow-up via Resend').item.json.id ?? null }}"
+            },
+            {
+              "fieldId": "sent_at",
+              "fieldValue": "={{ DateTime.now().toUTC().toISO() }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "df0d55f5-17c6-400a-88fb-70657149692c",
+      "typeVersion": 1,
+      "name": "Update Inquiry Follow-up Sent",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        2240,
+        16
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "inquiries",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "keyName": "followup_status",
+              "condition": "eq",
+              "keyValue": "scheduled"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "followup_status",
+              "fieldValue": "sent"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "0a9fb842-507c-44c7-a9cd-b04eda040f8a",
+      "typeVersion": 1,
+      "name": "Log Follow-up Email Sent",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        2464,
+        16
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "activity_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "follow_up_email_sent"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { email_message_id: $('Queue Follow-up Email').item.json.id, idempotency_key: $('Evaluate Follow-up Eligibility').item.json.idempotency_key, provider: \"resend\", provider_message_id: $('Send Follow-up via Resend').item.json.id ?? null, recipient_email: $('Evaluate Follow-up Eligibility').item.json.recipient_email, subject: $('Evaluate Follow-up Eligibility').item.json.subject, hours_since_initial: $('Evaluate Follow-up Eligibility').item.json.hours_since_initial } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "788e150c-8bd2-43e4-9881-81f6ad240100",
+      "typeVersion": 1,
+      "name": "Mark Follow-up Failed",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        2016,
+        288
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "email_messages",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Queue Follow-up Email').item.json.id }}"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "failed"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "cecb569b-2e83-4d3d-9ad8-9aaad5d5f30c",
+      "typeVersion": 1,
+      "name": "Record Follow-up Send Error",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        2240,
+        288
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "workflow_errors",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.submission_id ?? null }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "WF03 - Automated Follow-up"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "Send Follow-up via Resend"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ String($('Send Follow-up via Resend').item.json.error?.message || $('Send Follow-up via Resend').item.json.error?.description || $('Send Follow-up via Resend').item.json.message || 'Resend API request failed').slice(0, 1000) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "84d18b78-3b75-46e4-8ed6-5b51dd81d04c",
+      "typeVersion": 1,
+      "name": "Log Follow-up Email Failed",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        2464,
+        288
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "activity_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "follow_up_email_failed"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { email_message_id: $('Queue Follow-up Email').item.json.id, idempotency_key: $('Evaluate Follow-up Eligibility').item.json.idempotency_key, provider: \"resend\" } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "7c252098-e36b-47e8-82ab-693959f80a28",
+      "typeVersion": 1,
+      "name": "Record Follow-up Lock Error",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        1792,
+        432
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "workflow_errors",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "fieldId": "submission_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.submission_id ?? null }}"
+            },
+            {
+              "fieldId": "workflow_name",
+              "fieldValue": "WF03 - Automated Follow-up"
+            },
+            {
+              "fieldId": "execution_id",
+              "fieldValue": "={{ $execution.id }}"
+            },
+            {
+              "fieldId": "node_name",
+              "fieldValue": "Queue Follow-up Email"
+            },
+            {
+              "fieldId": "error_message",
+              "fieldValue": "={{ String($('Queue Follow-up Email').item.json.error?.message || $('Queue Follow-up Email').item.json.message || 'Could not queue follow-up email row').slice(0, 1000) }}"
+            },
+            {
+              "fieldId": "status",
+              "fieldValue": "open"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "559071b2-65d8-4330-aa50-940dff1a7325",
+      "typeVersion": 1,
+      "name": "Update Inquiry Follow-up Status",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        1568,
+        592
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "update",
+        "tableId": "inquiries",
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.inquiry_id }}"
+            },
+            {
+              "keyName": "followup_status",
+              "condition": "eq",
+              "keyValue": "scheduled"
+            }
+          ]
+        },
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "followup_status",
+              "fieldValue": "={{ $json.next_followup_status }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "ee55a5fe-ca19-48d4-b646-4895b1f5700d",
+      "typeVersion": 1,
+      "name": "Log Follow-up Status Change",
+      "type": "n8n-nodes-base.supabase",
+      "position": [
+        1792,
+        592
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "create",
+        "tableId": "activity_logs",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "inquiry_id",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.inquiry_id }}"
+            },
+            {
+              "fieldId": "event_type",
+              "fieldValue": "={{ $('Evaluate Follow-up Eligibility').item.json.next_followup_status === 'stopped' ? 'follow_up_stopped' : 'follow_up_reconciled_sent' }}"
+            },
+            {
+              "fieldId": "event_data",
+              "fieldValue": "={{ { reason: $('Evaluate Follow-up Eligibility').item.json.reason, lead_status: $('Evaluate Follow-up Eligibility').item.json.lead_status, followup_status: $('Evaluate Follow-up Eligibility').item.json.next_followup_status } }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_SUPABASE_CREDENTIAL_ID",
+          "name": "Supabase LeadFlow"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1000
+    }
+  ],
+  "connections": {
+    "Hourly Follow-up Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Scheduled Inquiries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Scheduled Inquiries": {
+      "main": [
+        [
+          {
+            "node": "Fetch Initial Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Initial Emails": {
+      "main": [
+        [
+          {
+            "node": "Fetch Existing Follow-ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing Follow-ups": {
+      "main": [
+        [
+          {
+            "node": "Fetch Lead Contacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Lead Contacts": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Follow-up Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Follow-up Eligibility": {
+      "main": [
+        [
+          {
+            "node": "If Action Is Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Action Is Send": {
+      "main": [
+        [
+          {
+            "node": "Queue Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Inquiry Follow-up Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue Follow-up Email": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up via Resend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Follow-up Lock Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up via Resend": {
+      "main": [
+        [
+          {
+            "node": "Mark Follow-up Sent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Follow-up Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Follow-up Sent": {
+      "main": [
+        [
+          {
+            "node": "Update Inquiry Follow-up Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Inquiry Follow-up Sent": {
+      "main": [
+        [
+          {
+            "node": "Log Follow-up Email Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Follow-up Failed": {
+      "main": [
+        [
+          {
+            "node": "Record Follow-up Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Follow-up Send Error": {
+      "main": [
+        [
+          {
+            "node": "Log Follow-up Email Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Inquiry Follow-up Status": {
+      "main": [
+        [
+          {
+            "node": "Log Follow-up Status Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "nodeGroups": [
+    {
+      "id": "b339be73-f941-421c-85d7-27b971bdd3fd",
+      "name": "Load Candidates",
+      "nodeNames": [
+        "Fetch Scheduled Inquiries",
+        "Fetch Initial Emails",
+        "Fetch Existing Follow-ups",
+        "Fetch Lead Contacts"
+      ],
+      "description": "Loads scheduled inquiries with their delivered initial emails, existing follow-ups, and contacts."
+    },
+    {
+      "id": "7793a99f-79cd-4ca4-89ec-672a75162a2b",
+      "name": "Evaluate & Route",
+      "nodeNames": [
+        "Evaluate Follow-up Eligibility",
+        "If Action Is Send"
+      ],
+      "description": "Applies 24h window and stop rules deterministically; routes send vs stop/reconcile."
+    },
+    {
+      "id": "2ea4c31b-c7a0-4de3-8479-23ba80890f40",
+      "name": "Send Follow-up",
+      "nodeNames": [
+        "Queue Follow-up Email",
+        "Send Follow-up via Resend",
+        "Mark Follow-up Sent",
+        "Update Inquiry Follow-up Sent",
+        "Log Follow-up Email Sent",
+        "Mark Follow-up Failed",
+        "Record Follow-up Send Error",
+        "Log Follow-up Email Failed",
+        "Record Follow-up Lock Error"
+      ],
+      "description": "Queues row (duplicate lock), sends via Resend with Idempotency-Key, records delivery or failure."
+    },
+    {
+      "id": "1cc6efa8-62b8-4b7d-a2e4-eff02eecda81",
+      "name": "Stop or Reconcile",
+      "nodeNames": [
+        "Update Inquiry Follow-up Status",
+        "Log Follow-up Status Change"
+      ],
+      "description": "Sets followup_status to stopped (or sent when reconciling) and logs the reason."
+    }
+  ],
+  "tags": [
+    {
+      "name": "followup"
+    },
+    {
+      "name": "leadflow-ai"
+    },
+    {
+      "name": "wf03"
+    }
+  ]
+}
