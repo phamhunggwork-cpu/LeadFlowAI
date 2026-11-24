@@ -13,6 +13,7 @@
 | ADR-007 | 2026-11-23 | Accepted | Switch Primary LLM Provider to DeepSeek (`deepseek-chat`) |
 | ADR-008 | 2026-11-24 | Accepted | WF03 Deterministic Follow-up Template & Reconciliation |
 | ADR-009 | 2026-11-24 | Accepted | WF04 Global Error Handler, Secret Redaction & Slack Alert Fallback |
+| ADR-010 | 2026-11-24 | Accepted | Run-Scoped Prefix Isolation on Dev Supabase for Day 13 E2E Portfolio Runs |
 
 ---
 
@@ -85,3 +86,10 @@
   - `Record Workflow Error` uses `onError: 'continueErrorOutput'` routed into the same `Prepare Admin Alert` NoOp convergence node so Slack still fires with an explicit DB-failure indicator if Supabase is unreachable.
   - Per developer choice, WF04 posts `[WORKFLOW ERROR]` Block Kit alerts to `#sales-leads` (reusing the existing `Slack LeadFlow` bot channel) with direct links to the failed execution, workflow editor, and LeadFlow Dashboard.
 - **Consequences:** All 4 workflows (`WF01`–`WF04`) are now active and fault-isolated; safe retries are guaranteed by `inquiries.submission_id` (UNIQUE), `contacts` normalized email + HubSpot upsert, and `email_messages.idempotency_key` (UNIQUE) + Resend `Idempotency-Key`.
+
+## ADR-010: Run-Scoped Prefix Isolation on Dev Supabase for Day 13 E2E Portfolio Runs
+- **Context:** `TESTING_STRATEGY.md` (ADR-006) recommends a dedicated Supabase test project (`TEST_SUPABASE_URL`) so automated Vitest tests never affect production data. On the developer's Supabase Free tier account (2/2 active projects already provisioned), creating a 3rd project is blocked and swapping n8n's `Supabase LeadFlow` credential back and forth before Day 14 demo adds configuration drift risk, while `leadflow-ai` contains only dev/demo data.
+- **Decision:**
+  - Keep the Vitest harness strictly environment-driven (`TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`, `TEST_SUPABASE_SERVICE_ROLE_KEY`, `TEST_RUN_PREFIX`) so production/CI deployments can point to a dedicated Supabase test project with zero code changes.
+  - For local solo-portfolio runs on `leadflow-ai` dev, enforce 3 isolation controls: (1) unique per-run prefix (`${TEST_RUN_PREFIX}<runId>_`) on every `submission_id` and email, (2) Resend safe test sink emails (`delivered+<prefix>@resend.dev`) so no real inbox is emailed, and (3) mandatory FK-safe `afterAll` cleanup (`workflow_errors` → `activity_logs` → `email_messages` → `lead_analyses` → `inquiries` → `contacts`) verified to leave `0` residual rows.
+- **Consequences:** Enables full live E2E verification across Express, n8n `WF01`–`WF04`, DeepSeek, HubSpot, Resend, Slack, and Supabase with zero leftover test data while preserving drop-in dedicated-test-DB portability.
